@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fretboard — 6-String Bass in BEADGC</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fretboard">
+<meta name="theme-color" content="#0C0908">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-fretboard.png">
+<link rel="icon" href="icon-fretboard.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ebony:#1E1815;
+    --pit:#0C0908;
+    --pearl:#C9C2B0;
+    --bone:#E3DCCB;
+    --brass:#C08A2E;
+    --ash:#C6BEAE;
+    --rule:rgba(201,194,176,.34);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--pit);color:var(--bone);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:max(28px,env(safe-area-inset-top)) 20px 56px;
+  }
+  .wrap{max-width:1060px;margin:0 auto}
+
+  header{
+    display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--rule);padding-bottom:16px;margin-bottom:24px;
+  }
+  h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:40px;line-height:1;margin:0}
+  h1 em{font-style:italic;color:var(--brass)}
+  .tuning{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ash)}
+
+  .lbl{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ash)}
+  .row{display:flex;flex-direction:column;gap:9px;margin-bottom:18px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+
+  button{
+    font-family:"IBM Plex Mono",monospace;font-size:16px;
+    background:#E8E2D5;color:#14100C;
+    border:1.5px solid #B5AB99;border-radius:3px;
+    padding:11px 15px;cursor:pointer;
+    transition:background .14s ease,border-color .14s ease,color .14s ease;
+  }
+  button:hover{background:#FFFBF2;border-color:#7C7263}
+  button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  button[aria-pressed="true"]{background:#F5B93F;border-color:#8A6413;color:#000000;font-weight:700;box-shadow:inset 0 0 0 1px #8A6413}
+  button[aria-pressed="true"]:hover{background:#FFC95E;border-color:#FFC95E}
+  .sans-chip{font-family:"IBM Plex Sans",sans-serif;font-size:15.5px}
+
+  .modes{display:flex;margin-bottom:18px;border:1px solid var(--rule);border-radius:2px;width:fit-content;overflow:hidden}
+  .modes button{border:0;border-radius:0;padding:8px 18px;letter-spacing:.06em}
+  .modes button + button{border-left:1px solid var(--rule)}
+
+  .group{margin-bottom:14px}
+  .gname{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ash);margin-bottom:7px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .gname::after{content:"";flex:1;height:1px;background:var(--rule)}
+
+  .board{
+    background:var(--ebony);border:1px solid var(--rule);border-radius:3px;
+    padding:8px 4px;overflow-x:auto;margin:22px 0;
+  }
+  .board svg{display:block;min-width:820px;width:100%;height:auto}
+
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px;border-top:1px solid var(--rule);padding-top:18px}
+  .cell .lbl{margin-bottom:7px;display:block}
+  .spell{font-family:"IBM Plex Mono",monospace;font-size:15px;line-height:1.9;letter-spacing:.04em}
+  .spell .r{color:var(--brass);font-weight:600}
+  .formula{color:var(--pearl)}
+  .legend{display:flex;flex-direction:column;gap:7px;font-size:12.5px;color:var(--ash)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:9px;vertical-align:-1px}
+  .i-root{background:var(--brass)}
+  .i-tone{background:var(--bone)}
+  .i-pass{background:transparent;border:1px solid var(--ash)}
+
+  .metro{border-top:1px solid var(--rule);margin-top:30px;padding-top:22px;display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+  .bpm{display:flex;align-items:baseline;gap:9px;min-width:150px}
+  .bpm b{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:56px;line-height:.9;color:var(--brass)}
+  .bpm span{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.2em;color:var(--ash)}
+  .mcol{display:flex;flex-direction:column;gap:12px;flex:1;min-width:240px}
+  input[type=range]{width:100%;accent-color:var(--brass);background:transparent}
+  input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4px}
+  .mrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .beats{display:flex;gap:7px;align-items:center;height:26px;margin-left:4px}
+  .beat{width:9px;height:9px;border-radius:50%;background:transparent;border:1px solid var(--ash);transition:transform .06s ease,background .06s ease}
+  .beat.on{background:var(--bone);border-color:var(--bone)}
+  .beat.on.acc{background:var(--brass);border-color:var(--brass);transform:scale(1.5)}
+
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  @media (max-width:560px){h1{font-size:31px}body{padding:20px 13px 44px}.bpm b{font-size:44px}}
+</style>
+</head>
+<body>
+<div style="padding:14px 0 0;margin:0 auto;max-width:1060px"></div>
+<div class="wrap">
+
+  <header>
+    <h1>Fretboard <em>reference</em></h1>
+    <div class="tuning">6-string bass · B E A D G C · frets 0–12</div>
+  </header>
+
+  <div class="row">
+    <span class="lbl">Root</span>
+    <div class="chips" id="roots"></div>
+  </div>
+
+  <div class="modes" role="group" aria-label="Scales or chords">
+    <button id="mode-scale" aria-pressed="true">Scales</button>
+    <button id="mode-chord" aria-pressed="false">Chords</button>
+  </div>
+
+  <div id="panel-scale">
+    <div class="row"><span class="lbl">Scale</span><div class="chips" id="scales"></div></div>
+  </div>
+
+  <div id="panel-chord" hidden><div id="chordGroups"></div></div>
+
+  <div class="row">
+    <span class="lbl">Display</span>
+    <div class="chips">
+      <button class="sans-chip" id="tgl-names" aria-pressed="true">Note names</button>
+      <button class="sans-chip" id="tgl-degs" aria-pressed="false">Scale degrees</button>
+      <button class="sans-chip" id="tgl-acc" aria-pressed="false">♭ spelling</button>
+    </div>
+  </div>
+
+  <div class="board"><svg id="fb" viewBox="0 0 1000 268" role="img" aria-label="Fretboard diagram"></svg></div>
+
+  <div class="readout">
+    <div class="cell"><span class="lbl">Notes</span><div class="spell" id="spelling"></div></div>
+    <div class="cell"><span class="lbl">Formula</span><div class="spell formula" id="formula"></div></div>
+    <div class="cell">
+      <span class="lbl">Reading the dots</span>
+      <div class="legend">
+        <div><i class="i-root"></i>Root</div>
+        <div><i class="i-tone"></i>Chord tone — 3rd, 5th, 7th</div>
+        <div><i class="i-pass"></i>Every other tone</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metro">
+    <div class="bpm"><b id="bpmVal">90</b><span>BPM</span></div>
+    <div class="mcol">
+      <input type="range" id="tempo" min="30" max="260" value="90" step="1" aria-label="Tempo in beats per minute">
+      <div class="mrow">
+        <button id="play" aria-pressed="false">Start</button>
+        <button id="minus" aria-label="Slower">−</button>
+        <button id="plus" aria-label="Faster">+</button>
+        <button id="tap">Tap</button>
+        <div class="beats" id="beats"></div>
+      </div>
+      <div class="mrow">
+        <span class="lbl" style="margin-right:4px">Beats per bar</span>
+        <div class="chips" id="meter"></div>
+      </div>
+      <div class="mrow">
+        <span class="lbl" style="margin-right:4px">Note value</span>
+        <div class="chips" id="subdiv"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const LETTERS=["C","D","E","F","G","A","B"];
+  const LETTER_PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+  const ACC={"-3":"♭♭♭","-2":"♭♭","-1":"♭","0":"","1":"♯","2":"♯♯","3":"♯♯♯"};
+
+  const ROOTS=[
+    {pc:0,sharp:"C",flat:"C"},{pc:1,sharp:"C♯",flat:"D♭"},{pc:2,sharp:"D",flat:"D"},
+    {pc:3,sharp:"D♯",flat:"E♭"},{pc:4,sharp:"E",flat:"E"},{pc:5,sharp:"F",flat:"F"},
+    {pc:6,sharp:"F♯",flat:"G♭"},{pc:7,sharp:"G",flat:"G"},{pc:8,sharp:"G♯",flat:"A♭"},
+    {pc:9,sharp:"A",flat:"A"},{pc:10,sharp:"A♯",flat:"B♭"},{pc:11,sharp:"B",flat:"B"}
+  ];
+
+  const SCALES=[
+    {n:"Major (Ionian)",s:[0,2,4,5,7,9,11],d:["1","2","3","4","5","6","7"]},
+    {n:"Dorian",s:[0,2,3,5,7,9,10],d:["1","2","♭3","4","5","6","♭7"]},
+    {n:"Phrygian",s:[0,1,3,5,7,8,10],d:["1","♭2","♭3","4","5","♭6","♭7"]},
+    {n:"Lydian",s:[0,2,4,6,7,9,11],d:["1","2","3","♯4","5","6","7"]},
+    {n:"Mixolydian",s:[0,2,4,5,7,9,10],d:["1","2","3","4","5","6","♭7"]},
+    {n:"Natural minor",s:[0,2,3,5,7,8,10],d:["1","2","♭3","4","5","♭6","♭7"]},
+    {n:"Locrian",s:[0,1,3,5,6,8,10],d:["1","♭2","♭3","4","♭5","♭6","♭7"]},
+    {n:"Harmonic minor",s:[0,2,3,5,7,8,11],d:["1","2","♭3","4","5","♭6","7"]},
+    {n:"Melodic minor",s:[0,2,3,5,7,9,11],d:["1","2","♭3","4","5","6","7"]},
+    {n:"Mixolydian ♭6",s:[0,2,4,5,7,8,10],d:["1","2","3","4","5","♭6","♭7"]},
+    {n:"Lydian dominant",s:[0,2,4,6,7,9,10],d:["1","2","3","♯4","5","6","♭7"]},
+    {n:"Phrygian dominant",s:[0,1,4,5,7,8,10],d:["1","♭2","3","4","5","♭6","♭7"]},
+    {n:"Altered",s:[0,1,3,4,6,8,10],d:["1","♭2","♭3","♭4","♭5","♭6","♭7"]},
+    {n:"Major pentatonic",s:[0,2,4,7,9],d:["1","2","3","5","6"]},
+    {n:"Minor pentatonic",s:[0,3,5,7,10],d:["1","♭3","4","5","♭7"]},
+    {n:"Blues",s:[0,3,5,6,7,10],d:["1","♭3","4","♭5","5","♭7"]},
+    {n:"Major blues",s:[0,2,3,4,7,9],d:["1","2","♭3","3","5","6"]},
+    {n:"Whole tone",s:[0,2,4,6,8,10],d:["1","2","3","♯4","♯5","♭7"]},
+    {n:"Diminished (W–H)",s:[0,2,3,5,6,8,9,11],d:["1","2","♭3","4","♭5","♭6","6","7"]},
+    {n:"Diminished (H–W)",s:[0,1,3,4,6,7,9,10],d:["1","♭2","♭3","3","♯4","5","6","♭7"]}
+  ];
+
+  const CHORD_GROUPS=[
+    {g:"Triads",items:[
+      {n:"maj",s:[0,4,7],d:["1","3","5"]},
+      {n:"min",s:[0,3,7],d:["1","♭3","5"]},
+      {n:"dim",s:[0,3,6],d:["1","♭3","♭5"]},
+      {n:"aug",s:[0,4,8],d:["1","3","♯5"]},
+      {n:"sus2",s:[0,2,7],d:["1","2","5"]},
+      {n:"sus4",s:[0,5,7],d:["1","4","5"]},
+      {n:"5",s:[0,7],d:["1","5"]}
+    ]},
+    {g:"Sixths",items:[
+      {n:"6",s:[0,4,7,9],d:["1","3","5","6"]},
+      {n:"m6",s:[0,3,7,9],d:["1","♭3","5","6"]},
+      {n:"6/9",s:[0,4,7,9,2],d:["1","3","5","6","9"]},
+      {n:"m6/9",s:[0,3,7,9,2],d:["1","♭3","5","6","9"]}
+    ]},
+    {g:"Sevenths",items:[
+      {n:"maj7",s:[0,4,7,11],d:["1","3","5","7"]},
+      {n:"7",s:[0,4,7,10],d:["1","3","5","♭7"]},
+      {n:"m7",s:[0,3,7,10],d:["1","♭3","5","♭7"]},
+      {n:"m(maj7)",s:[0,3,7,11],d:["1","♭3","5","7"]},
+      {n:"m7♭5",s:[0,3,6,10],d:["1","♭3","♭5","♭7"]},
+      {n:"dim7",s:[0,3,6,9],d:["1","♭3","♭5","♭♭7"]},
+      {n:"maj7♯5",s:[0,4,8,11],d:["1","3","♯5","7"]},
+      {n:"7sus4",s:[0,5,7,10],d:["1","4","5","♭7"]}
+    ]},
+    {g:"Ninths",items:[
+      {n:"maj9",s:[0,4,7,11,2],d:["1","3","5","7","9"]},
+      {n:"9",s:[0,4,7,10,2],d:["1","3","5","♭7","9"]},
+      {n:"m9",s:[0,3,7,10,2],d:["1","♭3","5","♭7","9"]},
+      {n:"m(maj9)",s:[0,3,7,11,2],d:["1","♭3","5","7","9"]},
+      {n:"m9♭5",s:[0,3,6,10,2],d:["1","♭3","♭5","♭7","9"]},
+      {n:"add9",s:[0,4,7,2],d:["1","3","5","9"]},
+      {n:"m add9",s:[0,3,7,2],d:["1","♭3","5","9"]},
+      {n:"9sus4",s:[0,5,7,10,2],d:["1","4","5","♭7","9"]}
+    ]},
+    {g:"Elevenths",items:[
+      {n:"maj11",s:[0,4,7,11,2,5],d:["1","3","5","7","9","11"]},
+      {n:"11",s:[0,7,10,2,5],d:["1","5","♭7","9","11"]},
+      {n:"m11",s:[0,3,7,10,2,5],d:["1","♭3","5","♭7","9","11"]},
+      {n:"maj7♯11",s:[0,4,7,11,6],d:["1","3","5","7","♯11"]},
+      {n:"7♯11",s:[0,4,7,10,6],d:["1","3","5","♭7","♯11"]}
+    ]},
+    {g:"Thirteenths",items:[
+      {n:"maj13",s:[0,4,7,11,2,9],d:["1","3","5","7","9","13"]},
+      {n:"13",s:[0,4,7,10,2,9],d:["1","3","5","♭7","9","13"]},
+      {n:"m13",s:[0,3,7,10,2,9],d:["1","♭3","5","♭7","9","13"]},
+      {n:"13sus4",s:[0,5,7,10,2,9],d:["1","4","5","♭7","9","13"]}
+    ]},
+    {g:"Altered dominants",items:[
+      {n:"7♭5",s:[0,4,6,10],d:["1","3","♭5","♭7"]},
+      {n:"7♯5",s:[0,4,8,10],d:["1","3","♯5","♭7"]},
+      {n:"7♭9",s:[0,4,7,10,1],d:["1","3","5","♭7","♭9"]},
+      {n:"7♯9",s:[0,4,7,10,3],d:["1","3","5","♭7","♯9"]},
+      {n:"7♭13",s:[0,4,7,10,8],d:["1","3","5","♭7","♭13"]},
+      {n:"7♯5♯9",s:[0,4,8,10,3],d:["1","3","♯5","♭7","♯9"]},
+      {n:"7♭5♭9",s:[0,4,6,10,1],d:["1","3","♭5","♭7","♭9"]},
+      {n:"7alt",s:[0,4,10,1,3,6,8],d:["1","3","♭7","♭9","♯9","♭5","♭13"]}
+    ]}
+  ];
+
+  const STRINGS=[
+    {name:"C",pc:0,w:1.1},{name:"G",pc:7,w:1.5},{name:"D",pc:2,w:2.0},
+    {name:"A",pc:9,w:2.6},{name:"E",pc:4,w:3.3},{name:"B",pc:11,w:4.1}
+  ];
+
+  const state={rootIdx:0,mode:"scale",scaleIdx:0,chord:[0,0],names:true,degs:false,sharps:false};
+
+  function current(){
+    return state.mode==="scale" ? SCALES[state.scaleIdx] : CHORD_GROUPS[state.chord[0]].items[state.chord[1]];
+  }
+
+  function spell(def){
+    const rootPc=ROOTS[state.rootIdx].pc;
+    const rootName=state.sharps?ROOTS[state.rootIdx].sharp:ROOTS[state.rootIdx].flat;
+    const li=LETTERS.indexOf(rootName[0]);
+    return def.s.map((sem,i)=>{
+      const target=(rootPc+sem)%12;
+      const degNum=parseInt(def.d[i].replace(/[^0-9]/g,""),10);
+      if(isNaN(degNum)) return state.sharps?ROOTS[target].sharp:ROOTS[target].flat;
+      const letter=LETTERS[(li+((degNum-1)%7))%7];
+      let diff=target-LETTER_PC[letter];
+      if(diff>6)diff-=12;
+      if(diff<-6)diff+=12;
+      const a=ACC[String(diff)];
+      return a===undefined ? (state.sharps?ROOTS[target].sharp:ROOTS[target].flat) : letter+a;
+    });
+  }
+
+  function isChordTone(deg){
+    const n=deg.replace(/[^0-9]/g,"");
+    return n==="1"||n==="3"||n==="5"||n==="7";
+  }
+
+  const NUT_X=46,END_X=966,TOP_Y=34,STR_GAP=36,FRETS=12;
+  function fretX(n){return NUT_X+((1-Math.pow(2,-n/12))/0.5)*(END_X-NUT_X);}
+
+  function draw(){
+    const def=current();
+    const notes=spell(def);
+    const map={};
+    def.s.forEach((sem,i)=>{map[(ROOTS[state.rootIdx].pc+sem)%12]={deg:def.d[i],note:notes[i]};});
+
+    let g="";
+    const bottom=TOP_Y+STR_GAP*5, mid=(TOP_Y+bottom)/2;
+    g+='<rect x="'+NUT_X+'" y="'+(TOP_Y-16)+'" width="'+(END_X-NUT_X)+'" height="'+(STR_GAP*5+32)+'" fill="#241C18" rx="2"/>';
+
+    [3,5,7,9].forEach(function(f){
+      var x=(fretX(f-1)+fretX(f))/2;
+      g+='<circle cx="'+x+'" cy="'+mid+'" r="6" fill="#C9C2B0" opacity=".15"/>';
+    });
+    var x12=(fretX(11)+fretX(12))/2;
+    g+='<circle cx="'+x12+'" cy="'+(mid-STR_GAP)+'" r="6" fill="#C9C2B0" opacity=".15"/>';
+    g+='<circle cx="'+x12+'" cy="'+(mid+STR_GAP)+'" r="6" fill="#C9C2B0" opacity=".15"/>';
+
+    for(var f=1;f<=FRETS;f++){
+      var x=fretX(f);
+      g+='<line x1="'+x+'" y1="'+(TOP_Y-14)+'" x2="'+x+'" y2="'+(bottom+14)+'" stroke="#8A8579" stroke-width="'+(f===12?2.4:1.6)+'" opacity=".78"/>';
+    }
+    g+='<rect x="'+(NUT_X-5)+'" y="'+(TOP_Y-16)+'" width="5" height="'+(STR_GAP*5+32)+'" fill="#C9C2B0" opacity=".85" rx="1"/>';
+
+    STRINGS.forEach(function(s,i){
+      var y=TOP_Y+i*STR_GAP;
+      g+='<line x1="'+NUT_X+'" y1="'+y+'" x2="'+END_X+'" y2="'+y+'" stroke="#9A9488" stroke-width="'+s.w+'" opacity=".5"/>';
+      g+='<text x="22" y="'+(y+5)+'" fill="#A39B8A" font-family="IBM Plex Mono, monospace" font-size="13" text-anchor="middle">'+s.name+'</text>';
+    });
+
+    for(var f2=1;f2<=FRETS;f2++){
+      var xm=(fretX(f2-1)+fretX(f2))/2;
+      g+='<text x="'+xm+'" y="'+(bottom+34)+'" fill="#A39B8A" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle">'+f2+'</text>';
+    }
+
+    STRINGS.forEach(function(s,i){
+      var y=TOP_Y+i*STR_GAP;
+      for(var f=0;f<=FRETS;f++){
+        var hit=map[(s.pc+f)%12];
+        if(!hit)continue;
+        var x=f===0?NUT_X-24:(fretX(f-1)+fretX(f))/2;
+        var isRoot=hit.deg==="1";
+        var tone=isChordTone(hit.deg);
+        var fill,stroke,txt,r;
+        if(isRoot){fill="#C08A2E";stroke=null;txt="#14100C";r=13.5;}
+        else if(tone){fill="#E3DCCB";stroke=null;txt="#17120F";r=12.5;}
+        else{fill="rgba(227,220,203,.14)";stroke="#A39B8A";txt="#E3DCCB";r=11.5;}
+        g+='<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'"'+(stroke?' stroke="'+stroke+'" stroke-width="1"':'')+'/>';
+        var label=state.names?hit.note:(state.degs?hit.deg:"");
+        if(label){
+          var fs=label.length>2?9:11;
+          g+='<text x="'+x+'" y="'+(y+4)+'" fill="'+txt+'" font-family="IBM Plex Mono, monospace" font-size="'+fs+'" font-weight="500" text-anchor="middle">'+label+'</text>';
+        }
+      }
+    });
+
+    document.getElementById("fb").innerHTML=g;
+    document.getElementById("spelling").innerHTML=notes.map(function(n,i){return i===0?'<span class="r">'+n+'</span>':n;}).join("  ·  ");
+    document.getElementById("formula").textContent=def.d.join("  ·  ");
+  }
+
+  function chip(text,pressed,onClick,cls){
+    var b=document.createElement("button");
+    b.textContent=text;
+    b.setAttribute("aria-pressed",pressed?"true":"false");
+    if(cls)b.className=cls;
+    b.addEventListener("click",onClick);
+    return b;
+  }
+
+  function renderChips(){
+    var rb=document.getElementById("roots");rb.innerHTML="";
+    ROOTS.forEach(function(r,i){
+      rb.appendChild(chip(state.sharps?r.sharp:r.flat,i===state.rootIdx,function(){
+        state.rootIdx=i;renderChips();draw();
+      }));
+    });
+
+    var sb=document.getElementById("scales");sb.innerHTML="";
+    SCALES.forEach(function(s,i){
+      sb.appendChild(chip(s.n,state.mode==="scale"&&state.scaleIdx===i,function(){
+        state.mode="scale";state.scaleIdx=i;syncMode();renderChips();draw();
+      },"sans-chip"));
+    });
+
+    var cg=document.getElementById("chordGroups");cg.innerHTML="";
+    CHORD_GROUPS.forEach(function(grp,gi){
+      var wrap=document.createElement("div");wrap.className="group";
+      var h=document.createElement("div");h.className="gname";h.textContent=grp.g;
+      var box=document.createElement("div");box.className="chips";
+      grp.items.forEach(function(it,ii){
+        box.appendChild(chip(it.n,state.mode==="chord"&&state.chord[0]===gi&&state.chord[1]===ii,function(){
+          state.mode="chord";state.chord=[gi,ii];syncMode();renderChips();draw();
+        }));
+      });
+      wrap.appendChild(h);wrap.appendChild(box);cg.appendChild(wrap);
+    });
+  }
+
+  function syncMode(){
+    var isScale=state.mode==="scale";
+    document.getElementById("mode-scale").setAttribute("aria-pressed",isScale?"true":"false");
+    document.getElementById("mode-chord").setAttribute("aria-pressed",isScale?"false":"true");
+    document.getElementById("panel-scale").hidden=!isScale;
+    document.getElementById("panel-chord").hidden=isScale;
+  }
+
+  document.getElementById("mode-scale").addEventListener("click",function(){state.mode="scale";syncMode();renderChips();draw();});
+  document.getElementById("mode-chord").addEventListener("click",function(){state.mode="chord";syncMode();renderChips();draw();});
+  document.getElementById("tgl-names").addEventListener("click",function(){state.names=true;state.degs=false;syncDisp();draw();});
+  document.getElementById("tgl-degs").addEventListener("click",function(){state.degs=true;state.names=false;syncDisp();draw();});
+  document.getElementById("tgl-acc").addEventListener("click",function(){state.sharps=!state.sharps;syncDisp();renderChips();draw();});
+
+  function syncDisp(){
+    document.getElementById("tgl-names").setAttribute("aria-pressed",state.names?"true":"false");
+    document.getElementById("tgl-degs").setAttribute("aria-pressed",state.degs?"true":"false");
+    var a=document.getElementById("tgl-acc");
+    a.setAttribute("aria-pressed",state.sharps?"true":"false");
+    a.textContent=state.sharps?"♯ spelling":"♭ spelling";
+  }
+
+  /* metronome */
+  var ctx=null,running=false,timer=null,taps=[],bpm=90,perBar=4;
+  var barStart=0,tickInBar=0,bpc=1; /* bpc = beats per click */
+  var NOTE_VALUES=[
+    {n:"Whole",bpc:4},{n:"Half",bpc:2},{n:"Quarter",bpc:1},
+    {n:"Eighth",bpc:0.5},{n:"16th",bpc:0.25},{n:"32nd",bpc:0.125}
+  ];
+  var beatsEl=document.getElementById("beats");
+
+  function ticksPerBar(){return Math.max(1,Math.ceil(perBar/bpc));}
+
+  function renderBeats(){
+    beatsEl.innerHTML="";
+    for(var i=0;i<perBar;i++){
+      var d=document.createElement("div");d.className="beat";beatsEl.appendChild(d);
+    }
+  }
+  function flash(i){
+    var kids=beatsEl.children;
+    for(var k=0;k<kids.length;k++)kids[k].className="beat";
+    if(kids[i])kids[i].className="beat on"+(i===0?" acc":"");
+  }
+  function click(time,accent,offbeat){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.value=accent?1600:(offbeat?1150:900);
+    g.gain.setValueAtTime(accent?0.5:(offbeat?0.16:0.3),time);
+    g.gain.exponentialRampToValueAtTime(0.0001,time+(offbeat?0.03:0.045));
+    o.connect(g);g.connect(ctx.destination);
+    o.start(time);o.stop(time+0.06);
+  }
+  function schedule(){
+    var spb=60/bpm;
+    while(barStart + tickInBar*bpc*spb < ctx.currentTime+0.15){
+      var t=barStart+tickInBar*bpc*spb;
+      var beatPos=tickInBar*bpc;
+      var onBeat=Math.abs(beatPos-Math.round(beatPos))<1e-9;
+      var accent=(tickInBar===0);
+      if(t>=ctx.currentTime-0.02) click(t,accent,!onBeat);
+      if(onBeat){
+        (function(idx,when){
+          setTimeout(function(){if(running)flash(idx);},Math.max(0,(when-ctx.currentTime)*1000));
+        })(Math.round(beatPos)%perBar,t);
+      }
+      tickInBar++;
+      if(tickInBar>=ticksPerBar()){tickInBar=0;barStart+=perBar*spb;}
+    }
+    timer=setTimeout(schedule,25);
+  }
+  function start(){
+    if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==="suspended")ctx.resume();
+    running=true;tickInBar=0;barStart=ctx.currentTime+0.08;
+    var p=document.getElementById("play");
+    p.textContent="Stop";p.setAttribute("aria-pressed","true");
+    schedule();
+  }
+  function stop(){
+    running=false;clearTimeout(timer);
+    var p=document.getElementById("play");
+    p.textContent="Start";p.setAttribute("aria-pressed","false");
+    renderBeats();
+  }
+  function setBpm(v){
+    bpm=Math.min(260,Math.max(30,Math.round(v)));
+    document.getElementById("bpmVal").textContent=bpm;
+    document.getElementById("tempo").value=bpm;
+  }
+
+  document.getElementById("play").addEventListener("click",function(){running?stop():start();});
+  document.getElementById("tempo").addEventListener("input",function(e){setBpm(+e.target.value);});
+  document.getElementById("minus").addEventListener("click",function(){setBpm(bpm-1);});
+  document.getElementById("plus").addEventListener("click",function(){setBpm(bpm+1);});
+  document.getElementById("tap").addEventListener("click",function(){
+    var now=performance.now();
+    taps=taps.filter(function(t){return now-t<2500;});
+    taps.push(now);
+    if(taps.length>=2){
+      var sum=0;
+      for(var i=1;i<taps.length;i++)sum+=taps[i]-taps[i-1];
+      setBpm(60000/(sum/(taps.length-1)));
+    }
+    if(taps.length>6)taps.shift();
+  });
+
+  var meterBox=document.getElementById("meter");
+  function renderMeter(){
+    meterBox.innerHTML="";
+    [2,3,4,5,6,7].forEach(function(n){
+      meterBox.appendChild(chip(String(n),n===perBar,function(){
+        perBar=n;tickInBar=0;
+        if(running&&ctx)barStart=ctx.currentTime+0.08;
+        renderMeter();renderBeats();
+      }));
+    });
+  }
+
+  var subBox=document.getElementById("subdiv");
+  function renderSub(){
+    subBox.innerHTML="";
+    NOTE_VALUES.forEach(function(v){
+      subBox.appendChild(chip(v.n,v.bpc===bpc,function(){
+        bpc=v.bpc;tickInBar=0;
+        if(running&&ctx)barStart=ctx.currentTime+0.08;
+        renderSub();
+      },"sans-chip"));
+    });
+  }
+
+  renderChips();syncMode();syncDisp();draw();renderMeter();renderSub();renderBeats();setBpm(90);
+})();
+</script>
+</body>
+</html>

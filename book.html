@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book — DSJ Charts</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Book">
+<meta name="theme-color" content="#0C0908">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-book.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F4EFE3; --ink:#15110D; --rule:#C3B9A4; --brass:#9A6B12;
+  --chrome:#26201B; --chrome2:#372E27; --chromeInk:#F2ECDE; --dim:#8A806E;
+}
+body.stage{ --paper:#121110; --ink:#F4EFE3; --rule:#4A443A; --brass:#F5B93F; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--chrome); color:var(--chromeInk);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+#app{display:flex;height:100vh;height:100dvh}
+
+/* ---------- library ---------- */
+#lib{
+  width:260px;flex:0 0 260px;background:var(--chrome);
+  border-right:1px solid rgba(255,255,255,.14);
+  display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);
+}
+#lib h1{
+  font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:27px;
+  margin:16px 16px 4px;line-height:1;
+}
+#lib h1 em{font-style:italic;color:var(--brass)}
+.count{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:#B5AB97;margin:0 16px 12px}
+#search{
+  margin:0 12px 10px;padding:10px 12px;font-size:15px;
+  font-family:"IBM Plex Sans",sans-serif;
+  background:#F4EFE3;color:#15110D;border:1px solid #9E9484;border-radius:3px;width:calc(100% - 24px);
+}
+#search:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+#songs{flex:1;overflow-y:auto;padding:0 8px 20px}
+.song{
+  display:block;width:100%;text-align:left;background:transparent;color:#F2ECDE;
+  border:0;border-radius:3px;padding:11px 12px;font-size:15px;cursor:pointer;
+  font-family:"IBM Plex Sans",sans-serif;line-height:1.25;
+}
+.song:hover{background:#3D342C}
+.song:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+.song.sel{background:#F5B93F;color:#000;font-weight:600}
+.song small{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;opacity:.62;margin-top:2px}
+.song.sel small{opacity:.75}
+#libfoot{padding:10px 12px;border-top:1px solid rgba(255,255,255,.14)}
+
+/* ---------- main ---------- */
+#main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--paper)}
+#bar{
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  padding:calc(9px + env(safe-area-inset-top)) 12px 9px;
+  background:var(--chrome2);border-bottom:1px solid rgba(255,255,255,.14);
+}
+button.ctl{
+  font-family:"IBM Plex Mono",monospace;font-size:15px;
+  background:#E8E2D5;color:#14100C;border:1.5px solid #B5AB99;border-radius:3px;
+  padding:9px 13px;cursor:pointer;line-height:1;
+}
+button.ctl:hover{background:#FFFBF2}
+button.ctl:focus-visible{outline:2px solid #F5B93F;outline-offset:2px}
+button.ctl[aria-pressed="true"]{background:#F5B93F;border-color:#8A6413;color:#000;font-weight:700}
+.grp{display:flex;gap:4px;align-items:center}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:#C6BEAE;margin-right:2px}
+.keyout{font-family:"IBM Plex Mono",monospace;font-size:16px;color:#F5B93F;
+  min-width:52px;text-align:center;font-weight:600}
+input[type=range].spd{width:110px;accent-color:#F5B93F}
+
+#sheet{flex:1;overflow-y:auto;padding:26px 22px 60vh;scroll-behavior:auto}
+#title{font-family:"Instrument Serif",Georgia,serif;font-weight:400;
+  font-size:calc(1.9em);line-height:1;margin:0 0 4px;color:var(--ink)}
+#meta{font-family:"IBM Plex Mono",monospace;font-size:.72em;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:22px}
+.sec{
+  font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.78em;
+  letter-spacing:.19em;text-transform:uppercase;color:var(--brass);
+  margin:24px 0 8px;display:flex;align-items:center;gap:11px;
+}
+.sec::after{content:"";flex:1;height:1px;background:var(--rule)}
+.row{display:flex;flex-wrap:wrap;margin:0 0 7px;border-left:2px solid var(--ink)}
+.bar{
+  flex:1 1 auto;min-width:74px;padding:9px 9px;
+  border-right:2px solid var(--ink);
+  font-family:"IBM Plex Mono",monospace;font-weight:500;
+  color:var(--ink);white-space:nowrap;
+}
+.bar .dot{color:var(--rule)}
+.bar .rep{color:var(--brass);font-weight:700}
+.bar .cmt{font-family:"IBM Plex Sans",sans-serif;font-style:italic;color:var(--dim);font-weight:400}
+.bar .nav{color:var(--brass);font-weight:600;font-size:.85em;letter-spacing:.06em}
+.bar .end{color:var(--brass);font-weight:700;font-size:.8em;vertical-align:.35em;margin-right:3px}
+.plain{font-family:"IBM Plex Sans",sans-serif;color:var(--dim);margin:6px 0}
+
+#empty{padding:60px 24px;color:var(--dim);font-size:16px}
+#paste{position:fixed;inset:0;background:rgba(10,8,6,.72);display:none;
+  align-items:center;justify-content:center;padding:20px;z-index:20}
+#paste.on{display:flex}
+#pastebox{background:#F4EFE3;color:#15110D;border-radius:5px;padding:18px;
+  width:min(680px,100%);max-height:86vh;display:flex;flex-direction:column;gap:11px}
+#pastebox h2{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:24px;margin:0}
+#pastebox p{margin:0;font-size:13.5px;color:#5E5648;line-height:1.45}
+#pastetext{flex:1;min-height:210px;font-family:"IBM Plex Mono",monospace;font-size:13px;
+  padding:11px;border:1px solid #B5AB99;border-radius:3px;resize:vertical;background:#FFFBF2;color:#15110D}
+.pasterow{display:flex;gap:8px;justify-content:flex-end}
+
+#libtoggle{display:none}
+@media (max-width:760px){
+  #lib{position:fixed;z-index:15;left:0;top:0;bottom:0;transform:translateX(-100%);
+       transition:transform .18s ease;box-shadow:0 0 40px rgba(0,0,0,.5)}
+  body.libopen #lib{transform:none}
+  #libtoggle{display:inline-block}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+body.perform #lib{display:none}
+body.perform #bar{padding-top:calc(5px + env(safe-area-inset-top));padding-bottom:5px}
+body.perform #bar .hideperf{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <aside id="lib">
+    <h1>The <em>Book</em></h1>
+    <div class="count" id="count"></div>
+    <input id="search" type="search" placeholder="Find a song" aria-label="Find a song">
+    <div id="songs"></div>
+    <div id="libfoot"><button class="ctl" id="addbtn" style="width:100%">Add a chart</button></div>
+  </aside>
+
+  <main id="main">
+    <div id="bar">
+      <button class="ctl" id="libtoggle" aria-label="Show song list">☰</button>
+      <div class="grp"><span class="tag hideperf">Key</span>
+        <button class="ctl" id="down" aria-label="Transpose down">−</button>
+        <span class="keyout" id="keyout">—</span>
+        <button class="ctl" id="up" aria-label="Transpose up">+</button>
+        <button class="ctl" id="reset" title="Back to original key">↺</button>
+      </div>
+      <div class="grp">
+        <button class="ctl" id="letters" aria-pressed="true">Letters</button>
+        <button class="ctl" id="numbers" aria-pressed="false">Numbers</button>
+      </div>
+      <div class="grp"><span class="tag hideperf">Size</span>
+        <button class="ctl" id="smaller" aria-label="Smaller text">A−</button>
+        <button class="ctl" id="bigger" aria-label="Larger text">A+</button>
+      </div>
+      <div class="grp"><span class="tag hideperf">Scroll</span>
+        <button class="ctl" id="scroll" aria-pressed="false">Start</button>
+        <input class="spd" id="speed" type="range" min="4" max="90" value="22" aria-label="Scroll speed">
+      </div>
+      <div class="grp">
+        <button class="ctl" id="stage" aria-pressed="false">Stage</button>
+        <button class="ctl" id="perform" aria-pressed="false">Focus</button>
+      </div>
+    </div>
+    <div id="sheet"><div id="empty">Pick a song from the list to open it.</div></div>
+  </main>
+</div>
+
+<div id="paste" role="dialog" aria-modal="true" aria-label="Add a chart">
+  <div id="pastebox">
+    <h2>Add a chart</h2>
+    <p>Paste ChordPro. Header lines in braces, bars separated by pipes — for example
+       <code>{title: Song}</code>, <code>{key: G}</code>, <code>{comment: Verse}</code>,
+       then <code>| G | C | D | G |</code>. Charts added here last for this session only.</p>
+    <textarea id="pastetext" spellcheck="false" placeholder="{title: New Song}&#10;{key: G}&#10;{tempo: 120}&#10;{time: 4/4}&#10;&#10;{comment: Verse}&#10;| G | C | D | G |"></textarea>
+    <div class="pasterow">
+      <button class="ctl" id="pastecancel">Cancel</button>
+      <button class="ctl" id="pastesave" aria-pressed="true">Add chart</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var CHARTS = {"25 Or 6 To 4": "{title: 25 Or 6 To 4}\n{key: Am}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| : Am | G | F♯ | F . . E : | (2x) |\n\n{comment: Verse}\n\n{comment: Outro}\n| : Am | G | F♯ | 1. F . . E : | 2. F . . E | Dm | C | B | B♭ | Am |\n\n{comment: Words}\n| (Waiting for the break of day) |\n| (Searching for something to say) |\n| (Flashing lights up in the sky) |\n| (Giving up I close my eyes) |\n| (Sitting crosslegged on the floor) |\n| (25 or 6 to 4) |\n| (Staring blindly into space) |\n| (Getting up to splash my face) |\n| (Trying just to stay awake) |\n| (Wondering how much more I can take) |\n| (Should I try to do some more?) |\n| (25 or 6 to 4) |\n| (solo) |\n| (Feeling like I ought to sleep) |\n| (Spinning room is sinking deep) |\n| (Searching for something to say) |\n| (Waiting for the break of day) |\n| (25 or 6 to 4) |\n| (25 or 6 to 4) |\n", "Born On The Bayou": "{title: Born On The Bayou}\n{subtitle: W/ Susie Q & Green River Mashup}\n{key: E}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| : E | % | % | % : |\n\n{comment: Verse1}\n| E . B . | % | % | % | E . B . | % | % | % | E . B . | % | D . A G | E |\n\n{comment: Chorus}\n| E . B . | E . B D A G | E . B | E . B D A G | E . B . | E . B D A G | E . B . | E . B |\n| . | (To Green River) |\n\n{comment: Green River}\n| Coda | : E . B . | (vamp) : |\n\n{comment: Chorus}\n| C . . G | A . . E | E | Coda |\n\n{comment: Susie Q}\n| (To Susie Q) |\n\n{comment: SQ Intro}\n| E . B . | % | % | % | E . B . | % | % | % |\n\n{comment: Verse1}\n| : E . B . | % | % | % | A . E . | C . G . | B . F♯ . | E . B . : | (2x) |\n\n{comment: Solo}\n| : E . B . | (vamp) : |\n\n{comment: Outro}\n| (Back to Born E vamp and fade) |\n", "Call Me The Breeze": "{title: Call Me The Breeze}\n{key: A}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| A . D . E |\n", "Can’t You See": "{title: Can’t You See}\n{key: G}\n{tempo: 90}\n{time: 4/4}\n{comment: Chart written in Nashville numbers}\n\n{comment: In}\n| 1 . 4 . 5 |\n", "Cold Shot": "{title: Cold Shot}\n{key: A}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| A | % | % | % | D | % | % | % | A | % | E |\n", "Don’t Change Horses": "{title: Don’t Change Horses}\n{subtitle: In The Middle Of The Stream (Soul Groove)}\n{key: Gm}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| Gm | Gm | Gm | Gm |\n\n{comment: Verse}\n| Gm | Gm | Gm | Gm | C | C | Gm | Gm | (walk to) | D | C | G |\n\n{comment: Chorus}\n| Gm | Gm | Gm | Gm |\n\n{comment: Verse 2}\n| Gm | % | % | % | C | % | Gm | % | D | C | G | ([Chorus]) |\n\n{comment: Solo}\n| ([Verse] [Chorus]) |\n\n{comment: Chorus}\n| Gm | % | % | % |\n\n{comment: Verse 3}\n| Gm | % | % | (Ooh ooh ooh) | % | C | % | Gm | Gm | D | C | G |\n\n{comment: Ending}\n| : Gm | % | % | % : | (x5) | (double tap x4) |\n", "Give Me One Reason": "{title: Give Me One Reason}\n{key: F♯}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| F♯ . B . C♯ |\n", "Giving It Up For Your Love": "{title: Giving It Up For Your Love}\n{key: C}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| : C . . . . B♭ | F | C . . . . B♭ | F : |\n\n{comment: Verse}\n| G |\n", "Hard to Handle - Hush": "{title: Hard to Handle / Hush}\n{key: B}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| : B D E F♯ | E D E D B : | (2x) |\n\n{comment: Verse}\n| Segno | : B | % | % | % | (x4) : |\n\n{comment: Pre Chorus}\n| Coda | F♯ | % | B | . | . | A E B | A E B | A E B | A E B |\n\n{comment: Verse 2}\n| D.S. al Coda |\n\n{comment: Verse 3}\n| D.S. al Coda |\n\n{comment: Solo}\n| (Repeat Verse) |\n\n{comment: Pre Chorus}\n| D.S. al Fine |\n\n{comment: Outro}\n| A E B | A E B | A E B | A E B⌒ |\n\n{comment: Hush}\n| (in B) |\n\n{comment: Intro}\n| G . D | A . E | B |\n\n{comment: Verse}\n| B | A | B | A |\n\n{comment: Chorus}\n| B | E | A | E |\n\n{comment: Bridge}\n| B | E | B |\n\n{comment: Arrange}\n| (intro verse) | (intro chorus) | (bridge verse) | (intro chorus) | (bridge intro) |\n", "Heart Of Rock N Roll": "{title: Heart Of Rock N Roll}\n{key: B♭}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| C | % | % | % | C | % | % | % |\n\n{comment: Verse}\n| : C | % | % | % | C | % | % | C B | B♭ | % | % | . | % | (walk to) | F | B♭ F C | C |\n\n{comment: Chorus}\n| B♭ | F | B♭ | F | E♭ | E♭ | D | G | 1. C | C | C G F D E♭ B♭ : | 2. C | C | C |\n\n{comment: Solo}\n| F | F | B♭ | B♭ | F | F | B♭ | B♭ | F | F | B♭ | B♭ | F | F | B♭ | D . G |\n\n{comment: 3rd Verse}\n| (Repeat Verse & Chorus) |\n\n{comment: Outro}\n| C . | (vamp thru fade) |\n", "Hold On Loosely": "{title: Hold On Loosely}\n{key: E}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| : E | E/E♭ | D | D/C♯ | C♯ B A E : |\n\n{comment: Verse1}\n| : E | E/E♭ | D | D/C♯ | C♯ B A E : | (2x) |\n\n{comment: Pre Chorus}\n| C | D | E♭ |\n\n{comment: Chorus}\n| E | E♭ | D | A . C♯ D | E | E♭ | D | A . . A♭ | F♯ | B | F♯ | A |\n\n{comment: Verse2}\n| : E | E/E♭ | D | D/C♯ | C♯ B A E : | (2x) |\n\n{comment: Pre Chorus}\n| C | D | E♭ |\n\n{comment: Chorus}\n| E | E♭ | D | A . C♯ D | E | E♭ | D | A . . A♭ | F♯ | B | F♯ | A |\n\n{comment: Break}\n| A | (w/ flange) | % | A | (flange off) | D | ▫ | A A B |\n\n{comment: Outro}\n| (Repeat Verse and Chorus, skip pre-chorus, then repeat Chorus to end) |\n", "Honky Tonk Woman": "{title: Honky Tonk Woman}\n{key: G}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| G | G | G | G |\n\n{comment: Verse1}\n| Segno | G | C | G . . A . . | D | G | C | G . . A . . | D |\n\n{comment: Chorus}\n| Coda | G | D | G | G | G | D | G | G |\n\n{comment: Verse2}\n| D.S. al Coda |\n\n{comment: Chorus}\n| D.S. al Fine |\n\n{comment: Solo}\n| D.S. al Coda |\n\n{comment: Chorus}\n| D.S. al Coda |\n\n{comment: Verse3}\n| D.S. al Coda |\n\n{comment: Chorus}\n| D.S. al Fine | (Repeat Chorus to end) |\n", "I Know A Little": "{title: I Know A Little}\n{key: A}\n{tempo: 90}\n{time: 4/4}\n{comment: Chart written in Nashville numbers}\n\n{comment: In}\n| (you know this one) |\n", "Keep You Hands To Yourself": "{title: Keep You Hands To Yourself}\n{key: A}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| (Old school rock) |\n\n{comment: All Same}\n| A | % | % | % | D | % | % | % | A | % | E | A |\n", "Long Train Running": "{title: Long Train Running}\n{key: G}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| G . C . G . | E♭ . D . C |\n", "Midnight Rider": "{title: Midnight Rider}\n{key: D}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| (Guitar open 2m, bass w drums) |\n| A D | A D | A D | A D |\n\n{comment: Verse}\n| A D . . G A C | D . . G A C | D . . . G A C | D . . G A C |\n\n{comment: Chorus}\n| G | C | D |\n\n{comment: Verse 2}\n| A D . . G A C | D . . G A C | D . . . G A C | D . . G A C |\n\n{comment: Chorus}\n| G | C | D |\n\n{comment: Solo}\n| A D | A D | A D | A D | B♭ | C | B♭ | C | B♭ | C | A D | A D | A D | A D |\n\n{comment: Verse 3}\n| A D . . G A C | D . . G A C | D . . . G A C | D . . G A C |\n\n{comment: Chorus}\n| G | C | D |\n", "One Way Out": "{title: One Way Out}\n{key: A}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| (Guitar open) |\n| A | % | % | % | A | % | % | % | D | % | % | % | A | % | E | A |\n\n{comment: Verse}\n| A | % | % | % | A | % | % | % | D | % | % | % | A | % | E | A |\n\n{comment: Outro}\n| A | (walk down from E to A) |\n", "Ophelia": "{title: Ophelia}\n{key: C}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| G | B♭ C | B♭ C | B♭ C |\n\n{comment: Verse}\n| Segno | : C | E7 | A7 | D7 | F . . G7 . . | 1. C . A7 D7 | G : | 2. C . . D E |\n\n{comment: Chorus}\n| : F | C | G7 | C . D E | F | C | G7 | G7♯5 . A B♭ |\n\n{comment: Verse2}\n| D.S. al Coda | (through Chorus) |\n\n{comment: Solo}\n| (Lead over verse) |\n\n{comment: Outro}\n| (Repeat Chorus through end) |\n", "Peg": "{title: Peg}\n{key: G}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| G | F♯ | F | E | E♭ | D |\n\n{comment: Verse}\n| : C | % | % | % | F | % | C | % | G | F | C | C : |\n\n{comment: Chorus}\n| C . . B . . | A . . E . . | C . . B . | A . . E | D . . C . . | G . . F♯ | B . . E | A . . D |\n", "Pick Up The Pieces": "{title: Pick Up The Pieces}\n{key: F}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| C | % | % | % |\n\n{comment: Verse}\n| : F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | B♭ . . . B A♭ B♭ | B♭ . . . B♭ A♭ | F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ : |\n\n{comment: Chorus}\n| B♭ . . B♭ | B♭ . . B♭ | B♭ . . B♭ | B♭ . . B♭ | C | C |\n\n{comment: Verse 2}\n| F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | F . . . F E♭ F | F . . . F E♭ | B♭ . . . B A♭ B♭ | B♭ . . . B♭ A♭ | F . . . F E♭ F | F . . . F E♭ | (note shorter) |\n\n{comment: Chorus}\n| B♭ . . B♭ | B♭ . . B♭ | B♭ . . B♭ | B♭ . . B♭ | C | C | C | C |\n\n{comment: Break}\n| B♭ E♭ D♭ B♭ A♭ B♭ | B♭ . E♭ D♭ A♭ B♭ | B♭ E♭ D♭ B♭ A♭ B♭ | B♭ . E♭ D♭ A♭ B♭ | (repeat from 2nd v) | (end on F groove) |\n", "Rambling Man": "{title: Rambling Man}\n{key: G}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| G | D | C |\n\n{comment: Chorus}\n| G | F | G | G | G | C | D | D | C | G | F | C | G | D | G | G |\n\n{comment: Verse}\n| G | C | G | G | G | C | D | D | C | G | E | C | G | D | G | G |\n\n{comment: Intrlude}\n| D | G | D | (dec G7 scale) |\n\n{comment: Solo}\n| (over verse) |\n\n{comment: End Solo}\n| : G | F | G | G : |\n", "Remedy": "{title: Remedy}\n{key: B♭}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| F E C | E♭ D B♭ | F E C | E♭ D B♭ | C | % |\n\n{comment: Verse}\n| B♭ | % | C | % | B♭ | % | C | % | E♭ D B♭ | B♭ | F E C | C | E♭ D B♭ | B♭ | F E C | C |\n\n{comment: Chorus}\n| : B♭ . . D♭ . . | A♭ . . E♭ | B♭ . . D♭ . . | A♭ . . E♭ : |\n", "Roadhouse Blues": "{title: Roadhouse Blues}\n{key: E}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| E | (riff) |\n\n{comment: Verse}\n| E | (riff) |\n\n{comment: Chorus}\n| A | A | A | B |\n", "Shaky Ground": "{title: Shaky Ground}\n{key: E}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| E . C♯ D . G A | E . C♯ D . G A | E . C♯ D . G A | E . C♯ D . G A |\n\n{comment: Break}\n| Am | % | % | B |\n", "Sledgehammer": "{title: Sledgehammer}\n{key: E♭}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| E♭ . D♭ E♭ | D♭ E♭ . | D♭ E♭ . | D♭ E♭ . | B | B B♭ . A♭ | A♭ | A♭ |\n\n{comment: Verse}\n| : E♭ . G A♭ B♭ E♭⌒ | E♭ . G A♭ D♭ C | E♭ . G A♭ B♭ E♭⌒ | E♭ . G A♭ D♭ C | E♭ . G A♭ B♭ E♭⌒ | E♭ . G A♭ D♭ C | E♭ . G A♭ B♭ E♭⌒ | E♭ G A♭ D♭ C : |\n| 1. C | C . | D♭ E♭ : | 2,3. D♭ | F | D♭ | F | D♭ | F | D♭ | F : | (repeat 3 then) | Segno |\n\n{comment: Outro}\n| Segno | : D♭ E♭ | D♭ E♭ | D♭ E♭ | D♭ E♭ | B | A♭ : | (repeat to fade) |\n", "Soul Medley": "{title: Soul Medley}\n{key: C}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| (Mustang Sally) |\n\n{comment: Mustang}\n| : C7 | C7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | G7 | 1. . : | 2. . | C7 | C7 | F |\n\n{comment: Hold On}\n| Segno | : F | A♭ | B♭ | F : | F7 | % | % | % | B♭7 | % | % | % : | Segno |\n| B♭7 | % | % | % | A♭7 | A♭7 | B♭7 | C7 | F | E♭ | A♭ | B♭ | F | E♭ | A♭ | B♭ | : F | A♭ | B♭ | F : |\n\n{comment: Knock On wood}\n| : F | F | A♭ . B♭ | B♭ . C . E♭ | C . B♭ . A♭ |\n| B♭ | % | % | % | F | % | % | % | B♭ | % | % | % | F | B♭ | F | B♭ | F : |\n| G7 | A7 | B♭7 | B♭7 . A♭7 | : F7 | B♭7 | F7 | B♭7 : | F | A♭ | B♭ | C | E♭ . C . B♭ . A♭ | F |\n\n{comment: Midnight Hour}\n| C | A | G | F | D . G | % | % | % | : D . G | % | % | % : | A | G | A | G | D | G | D | G | : D | G | C | A | D | G | D . . C | A : | (outro) | C | A | G | F | D |\n", "Statesboro Blues": "{title: Statesboro Blues}\n{key: D}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| D | (riff) | D | (riff) | D . | (riff) | D | G | D | D | A | G | D C B B♭ | A |\n", "Superstition": "{title: Superstition}\n{key: E}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| E | % | % | % |\n\n{comment: Verse}\n| E | % | % | % |\n| E | (riff) | % | % | % |\n\n{comment: Chorus}\n| B | C | B | B♭ | A |\n", "The Letter": "{title: The Letter}\n{key: B♭}\n{tempo: 90}\n{time: 4/4}\n\n{comment: Intro}\n| B♭ | F♯ | B♭ | E♭ | B♭ . . A♭ | G . . F♯ | F | F | B♭ . . D♭ . E♭ | D♭ E♭ . D♭ | B♭ . . D♭ . E♭ | D♭ E♭ . D♭ |\n\n{comment: Chorus}\n| D♭ | A♭ | F♯ | D♭ | A♭ | D♭ | A♭ | F♯ | D♭ | A♭ | F |\n", "You Can Leave Your Hat On": "{title: You Can Leave Your Hat On}\n{key: B♭}\n{tempo: 90}\n{time: 4/4}\n\n{comment: In}\n| B♭ C E♭ C E♭ C | B♭ C E♭ C E♭ C | B♭ C E♭ C E♭ C | F G B♭ |\n\n{comment: Verse}\n| : C . . E E♭ E | B♭ C . E E♭ E : | B♭ E F G | (rest) |\n\n{comment: Prechorus}\n| F G B♭ G B♭ | G F B♭ G F G |\n\n{comment: Chorus}\n| B♭ A G F | G C E E♭ E | G B♭ C |\n"};
+
+/* ---------- music ---------- */
+var SHARP=["C","C\u266f","D","D\u266f","E","F","F\u266f","G","G\u266f","A","A\u266f","B"];
+var FLAT =["C","D\u266d","D","E\u266d","E","F","G\u266d","G","A\u266d","A","B\u266d","B"];
+var PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+var FLATKEYS={1:1,3:1,5:1,8:1,10:1};       /* pitch classes that read better flat */
+var MAJOR=[0,2,4,5,7,9,11];
+var DEG=["1","\u266d2","2","\u266d3","3","4","\u266d5","5","\u266d6","6","\u266d7","7"];
+
+var CHORD=/^([A-G])([\u266d\u266f#b])?((?:m|maj|min|sus|add|dim|aug)?[0-9\u266d\u266f#b+\-]*)(?:\/([A-G])([\u266d\u266f#b])?)?([\u25c7\u25b3\u2312]*)$/;
+var WORDS={"Segno":1,"Coda":1,"D.S.":1,"D.C.":1,"Fine":1,"al":1};
+
+function pcOf(letter,acc){
+  var v=PC[letter];
+  if(acc==="\u266f"||acc==="#")v+=1;
+  if(acc==="\u266d"||acc==="b")v-=1;
+  return ((v%12)+12)%12;
+}
+function nameOf(pc,useFlat){ return (useFlat?FLAT:SHARP)[((pc%12)+12)%12]; }
+
+function parseKey(k){
+  if(!k) return null;
+  var m=/^([A-G])([\u266d\u266f#b])?(m)?/.exec(k.trim());
+  if(!m) return null;
+  return {pc:pcOf(m[1],m[2]), minor:!!m[3]};
+}
+
+function degreeOf(pc,keyPc){
+  var iv=((pc-keyPc)%12+12)%12;
+  return DEG[iv];
+}
+
+/* Render one chord token, honouring transpose + number mode. */
+function renderChord(tok,st){
+  var m=CHORD.exec(tok);
+  if(!m) return null;
+  var pc=pcOf(m[1],m[2]);
+  var qual=m[3]||"";
+  var marks=m[6]||"";
+  var out;
+  if(st.numbers && st.keyPc!==null){
+    out=degreeOf(pc,st.keyPc)+qual;
+  }else{
+    var np=(pc+st.shift)%12;
+    var useFlat=st.useFlat;
+    out=nameOf(np,useFlat)+qual;
+  }
+  if(m[4]){
+    var bpc=pcOf(m[4],m[5]);
+    if(st.numbers && st.keyPc!==null) out+="/"+degreeOf(bpc,st.keyPc);
+    else out+="/"+nameOf((bpc+st.shift)%12,st.useFlat);
+  }
+  return out+marks;
+}
+
+/* ---------- chart parsing ---------- */
+function parseChart(text){
+  var c={title:"",key:"",tempo:"",time:"",blocks:[]};
+  var lines=text.split(/\r?\n/);
+  for(var i=0;i<lines.length;i++){
+    var ln=lines[i].trim();
+    if(!ln) continue;
+    var d=/^\{(\w+)\s*:\s*([\s\S]*)\}$/.exec(ln);
+    if(d){
+      var k=d[1].toLowerCase(), v=d[2].trim();
+      if(k==="title")c.title=v;
+      else if(k==="key")c.key=v;
+      else if(k==="tempo")c.tempo=v;
+      else if(k==="time")c.time=v;
+      else if(k==="comment"||k==="c")c.blocks.push({t:"sec",v:v});
+      else if(k==="subtitle")c.blocks.push({t:"sec",v:v});
+      continue;
+    }
+    if(ln.charAt(0)==="|"){
+      var cells=ln.split("|").map(function(s){return s.trim();});
+      cells=cells.filter(function(s,idx){ return !(idx===0&&s==="") && !(idx===cells.length-1&&s===""); });
+      c.blocks.push({t:"row",v:cells});
+      continue;
+    }
+    c.blocks.push({t:"text",v:ln});
+  }
+  return c;
+}
+
+/* ---------- rendering ---------- */
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function renderCell(cell,st){
+  if(!cell) return "";
+  var out=[];
+  /* leading ending number, e.g. "1." */
+  var em=/^([0-9,]+)\.\s+/.exec(cell);
+  if(em){ out.push('<span class="end">'+esc(em[1])+'</span>'); cell=cell.slice(em[0].length); }
+  var toks=cell.split(/\s+/);
+  for(var i=0;i<toks.length;i++){
+    var t=toks[i];
+    if(t==="") continue;
+    if(t==="."){ out.push('<span class="dot">\u00b7</span>'); continue; }
+    if(t==="%"){ out.push('<span class="rep">\u2717</span>'); continue; }
+    if(t===":"){ out.push('<span class="rep">:</span>'); continue; }
+    if(t.charAt(0)==="("){
+      var rest=toks.slice(i).join(" ");
+      out.push('<span class="cmt">'+esc(rest.replace(/^\(|\)$/g,""))+'</span>');
+      break;
+    }
+    if(WORDS[t]){
+      var w=toks.slice(i).join(" ");
+      out.push('<span class="nav">'+esc(w)+'</span>');
+      break;
+    }
+    var ch=renderChord(t,st);
+    out.push(ch!==null?esc(ch):'<span class="cmt">'+esc(t)+'</span>');
+  }
+  return out.join(" ");
+}
+
+function render(){
+  var sheet=document.getElementById("sheet");
+  if(!state.chart){ sheet.innerHTML='<div id="empty">Pick a song from the list to open it.</div>'; return; }
+  var c=state.chart;
+  var kp=parseKey(c.key);
+  var st={
+    shift:state.shift,
+    numbers:state.numbers,
+    keyPc: kp?kp.pc:null,
+    useFlat:false
+  };
+  if(kp){
+    var newPc=(kp.pc+state.shift+12)%12;
+    st.useFlat = !!FLATKEYS[newPc] || (kp.minor && !!FLATKEYS[newPc]);
+    if(!FLATKEYS[newPc]) st.useFlat=false;
+    /* keep flat spelling for keys normally written flat */
+    if(newPc===10||newPc===3||newPc===8||newPc===1||newPc===5) st.useFlat=true;
+  }
+  var h=[];
+  var keyTxt="";
+  if(kp){
+    var np=(kp.pc+state.shift+12)%12;
+    keyTxt=nameOf(np,st.useFlat)+(kp.minor?"m":"");
+  }
+  h.push('<h1 id="title">'+esc(c.title||"Untitled")+'</h1>');
+  var bits=[];
+  if(keyTxt)bits.push("Key "+keyTxt+(state.shift?" ("+(state.shift>0?"+":"")+state.shift+")":""));
+  if(c.tempo)bits.push(c.tempo+" bpm");
+  if(c.time)bits.push(c.time);
+  h.push('<div id="meta">'+esc(bits.join("  \u00b7  "))+'</div>');
+
+  for(var i=0;i<c.blocks.length;i++){
+    var b=c.blocks[i];
+    if(b.t==="sec"){ h.push('<div class="sec">'+esc(b.v)+'</div>'); }
+    else if(b.t==="text"){ h.push('<div class="plain">'+esc(b.v)+'</div>'); }
+    else{
+      var row=['<div class="row">'];
+      for(var j=0;j<b.v.length;j++) row.push('<div class="bar">'+renderCell(b.v[j],st)+'</div>');
+      row.push('</div>');
+      h.push(row.join(""));
+    }
+  }
+  sheet.innerHTML=h.join("");
+  document.getElementById("keyout").textContent=keyTxt||"—";
+  sheet.style.fontSize=state.size+"px";
+}
+
+/* ---------- state + wiring ---------- */
+var state={chart:null,name:null,shift:0,numbers:false,size:19,scrolling:false,speed:22};
+
+var songsEl=document.getElementById("songs");
+function names(){ return Object.keys(CHARTS).sort(function(a,b){return a.localeCompare(b);}); }
+
+function buildList(filter){
+  var f=(filter||"").toLowerCase();
+  var ns=names().filter(function(n){return n.toLowerCase().indexOf(f)>=0;});
+  songsEl.innerHTML="";
+  ns.forEach(function(n){
+    var c=parseChart(CHARTS[n]);
+    var b=document.createElement("button");
+    b.className="song"+(n===state.name?" sel":"");
+    b.innerHTML=esc(c.title||n)+"<small>"+esc([c.key,c.tempo?c.tempo+" bpm":""].filter(Boolean).join("  \u00b7  "))+"</small>";
+    b.addEventListener("click",function(){ open(n); });
+    songsEl.appendChild(b);
+  });
+  document.getElementById("count").textContent=ns.length+" charts";
+}
+
+function open(n){
+  state.name=n; state.chart=parseChart(CHARTS[n]); state.shift=0;
+  stopScroll();
+  document.getElementById("sheet").scrollTop=0;
+  document.body.classList.remove("libopen");
+  buildList(document.getElementById("search").value);
+  render();
+}
+
+function setShift(d){ if(!state.chart)return; state.shift=((state.shift+d)%12+12)%12; if(state.shift>6)state.shift-=12; render(); }
+
+document.getElementById("up").addEventListener("click",function(){setShift(1);});
+document.getElementById("down").addEventListener("click",function(){setShift(-1);});
+document.getElementById("reset").addEventListener("click",function(){state.shift=0;render();});
+document.getElementById("letters").addEventListener("click",function(){
+  state.numbers=false; sync(); render();
+});
+document.getElementById("numbers").addEventListener("click",function(){
+  state.numbers=true; sync(); render();
+});
+document.getElementById("bigger").addEventListener("click",function(){state.size=Math.min(38,state.size+2);render();});
+document.getElementById("smaller").addEventListener("click",function(){state.size=Math.max(12,state.size-2);render();});
+document.getElementById("search").addEventListener("input",function(e){buildList(e.target.value);});
+document.getElementById("libtoggle").addEventListener("click",function(){document.body.classList.toggle("libopen");});
+document.getElementById("stage").addEventListener("click",function(){
+  document.body.classList.toggle("stage");
+  this.setAttribute("aria-pressed",document.body.classList.contains("stage")?"true":"false");
+});
+document.getElementById("perform").addEventListener("click",function(){
+  document.body.classList.toggle("perform");
+  this.setAttribute("aria-pressed",document.body.classList.contains("perform")?"true":"false");
+});
+function sync(){
+  document.getElementById("letters").setAttribute("aria-pressed",state.numbers?"false":"true");
+  document.getElementById("numbers").setAttribute("aria-pressed",state.numbers?"true":"false");
+}
+
+/* scrolling */
+var raf=null,last=0,acc=0;
+function step(ts){
+  if(!state.scrolling)return;
+  if(!last)last=ts;
+  var dt=(ts-last)/1000; last=ts;
+  var sheet=document.getElementById("sheet");
+  acc+=state.speed*dt;
+  var px=Math.floor(acc);
+  if(px>0){ sheet.scrollTop+=px; acc-=px; }
+  if(sheet.scrollTop+sheet.clientHeight>=sheet.scrollHeight-2){ stopScroll(); return; }
+  raf=requestAnimationFrame(step);
+}
+function startScroll(){
+  state.scrolling=true; last=0; acc=0;
+  document.getElementById("scroll").textContent="Stop";
+  document.getElementById("scroll").setAttribute("aria-pressed","true");
+  raf=requestAnimationFrame(step);
+}
+function stopScroll(){
+  state.scrolling=false; if(raf)cancelAnimationFrame(raf); raf=null;
+  document.getElementById("scroll").textContent="Start";
+  document.getElementById("scroll").setAttribute("aria-pressed","false");
+}
+document.getElementById("scroll").addEventListener("click",function(){ state.scrolling?stopScroll():startScroll(); });
+document.getElementById("speed").addEventListener("input",function(e){ state.speed=+e.target.value; });
+
+/* paste-in charts */
+var pasteEl=document.getElementById("paste");
+document.getElementById("addbtn").addEventListener("click",function(){ pasteEl.classList.add("on"); document.getElementById("pastetext").focus(); });
+document.getElementById("pastecancel").addEventListener("click",function(){ pasteEl.classList.remove("on"); });
+document.getElementById("pastesave").addEventListener("click",function(){
+  var txt=document.getElementById("pastetext").value.trim();
+  if(!txt){ pasteEl.classList.remove("on"); return; }
+  var c=parseChart(txt);
+  var nm=c.title||("Untitled "+(Object.keys(CHARTS).length+1));
+  CHARTS[nm]=txt;
+  document.getElementById("pastetext").value="";
+  pasteEl.classList.remove("on");
+  buildList(document.getElementById("search").value);
+  open(nm);
+});
+
+/* keyboard: arrows page the chart, space toggles scroll */
+document.addEventListener("keydown",function(e){
+  if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT")return;
+  var sheet=document.getElementById("sheet");
+  if(e.key===" "){ e.preventDefault(); state.scrolling?stopScroll():startScroll(); }
+  else if(e.key==="ArrowDown"||e.key==="PageDown"){ e.preventDefault(); sheet.scrollTop+=sheet.clientHeight*0.85; }
+  else if(e.key==="ArrowUp"||e.key==="PageUp"){ e.preventDefault(); sheet.scrollTop-=sheet.clientHeight*0.85; }
+});
+
+buildList(""); sync(); render();
+})();
+</script>
+</body>
+</html>

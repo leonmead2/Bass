@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bass Tools</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bass">
+<meta name="theme-color" content="#0C0908">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-fretboard.png">
+<link rel="icon" href="icon-fretboard.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--pit:#0C0908;--bone:#E3DCCB;--brass:#F5B93F;--ash:#C6BEAE;--rule:rgba(201,194,176,.34)}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:var(--pit);color:var(--bone);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    padding:max(40px,calc(env(safe-area-inset-top) + 24px)) 22px 60px;
+  }
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:44px;line-height:1;margin:0 0 6px}
+  h1 em{font-style:italic;color:var(--brass)}
+  .sub{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;
+       text-transform:uppercase;color:var(--ash);margin-bottom:34px}
+  a.card{
+    display:flex;gap:16px;align-items:center;text-decoration:none;
+    background:#E8E2D5;color:#14100C;border:1.5px solid #B5AB99;border-radius:5px;
+    padding:18px;margin-bottom:14px;transition:background .14s ease,border-color .14s ease;
+  }
+  a.card:hover{background:#FFFBF2;border-color:#7C7263}
+  a.card:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+  a.card img{width:56px;height:56px;border-radius:11px;flex:0 0 56px}
+  .txt strong{display:block;font-family:"Instrument Serif",Georgia,serif;font-weight:400;
+              font-size:26px;line-height:1.05;margin-bottom:3px}
+  .txt span{font-size:14px;color:#5E5648;line-height:1.4;display:block}
+  .note{border-top:1px solid var(--rule);margin-top:30px;padding-top:18px;
+        font-size:13.5px;color:var(--ash);line-height:1.6}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bass <em>tools</em></h1>
+  <div class="sub">6-string · B E A D G C</div>
+
+  <a class="card" href="fretboard.html">
+    <img src="icon-fretboard.png" alt="">
+    <span class="txt">
+      <strong>Fretboard</strong>
+      <span>Scales, chords and arpeggios across the neck, with a metronome.</span>
+    </span>
+  </a>
+
+  <a class="card" href="book.html">
+    <img src="icon-book.png" alt="">
+    <span class="txt">
+      <strong>The Book</strong>
+      <span>Charts with live transpose, Nashville numbers and auto-scroll.</span>
+    </span>
+  </a>
+
+  <div class="note">
+    Add either one to the Home Screen from Safari and it opens full screen like an app.
+    Both run offline once loaded.
+  </div>
+</div>
+</body>
+</html>
