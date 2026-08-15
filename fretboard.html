@@ -77,7 +77,7 @@
     padding:8px 4px;overflow-x:auto;margin:22px 0;
   }
   .board svg{display:block;min-width:820px;width:100%;height:auto}
-  .board svg circle.nt{cursor:pointer}
+  .board svg circle.nt,.board svg circle.gh,.board svg text.gh,.board svg text.vc{cursor:pointer}
 
   .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px;border-top:1px solid var(--rule);padding-top:18px}
   .cell .lbl{margin-bottom:7px;display:block}
@@ -136,6 +136,7 @@
   <div id="panel-triad" hidden>
     <div id="shapeGroups"></div>
     <div class="row"><span class="lbl">Fingering</span><div class="chips" id="voicings"></div></div>
+    <div class="row"><span class="lbl">Fingers</span><div class="chips" id="fingerSets"></div></div>
   </div>
 
   <div class="row">
@@ -346,7 +347,8 @@
     ]}
   ];
 
-  const state={rootIdx:0,mode:"scale",scaleIdx:0,chord:[0,0],shape:[0,0],voiceIdx:0,
+  const state={rootIdx:0,mode:"scale",scaleIdx:0,chord:[0,0],shape:[0,0],voiceIdx:0,fingerIdx:0,
+               edit:null,sel:-1,
                names:true,degs:false,sharps:false};
 
   function shapeDef(){ return SHAPE_FAMILIES[state.shape[0]].items[state.shape[1]]; }
@@ -421,16 +423,56 @@
         }
       }
     }
-    out.sort(function(a,b){return a.min-b.min || a.strings[0]-b.strings[0];});
+    out.forEach(function(v){
+      v.span=Math.max.apply(null,v.frets)-Math.min.apply(null,v.frets.filter(function(f){return f>0;}).concat(v.frets));
+    });
+    out.sort(function(a,b){return a.span-b.span || a.min-b.min || a.strings[0]-b.strings[0];});
     return out;
   }
 
+  /* Distinct pressed frets, low to high. Two notes on the same fret
+     are barred with one finger. */
+  function pressedFrets(v){
+    var fs=[];
+    for(var i=0;i<v.frets.length;i++){
+      if(v.frets[i]>0 && fs.indexOf(v.frets[i])<0) fs.push(v.frets[i]);
+    }
+    return fs.sort(function(a,b){return a-b;});
+  }
+
+  /* Every way to assign k increasing fingers out of 1–4. */
+  function combos(k){
+    var res=[];
+    (function rec(start,cur){
+      if(cur.length===k){res.push(cur.slice());return;}
+      for(var f=start;f<=4;f++){cur.push(f);rec(f+1,cur);cur.pop();}
+    })(1,[]);
+    return res;
+  }
+
+  function fingerOptions(v){
+    var k=pressedFrets(v).length;
+    if(k===0||k>4) return [[]];
+    return combos(k);
+  }
+
   function fingerFor(v,j){
-    var pressed=v.frets.filter(function(f){return f>0;});
     if(v.frets[j]===0) return "0";
-    if(!pressed.length) return "";
-    var mn=Math.min.apply(null,pressed);
-    return String(Math.min(4,v.frets[j]-mn+1));
+    var fs=pressedFrets(v);
+    var opts=fingerOptions(v);
+    var opt=opts[Math.min(state.fingerIdx,opts.length-1)]||[];
+    var at=fs.indexOf(v.frets[j]);
+    return at<0?"":String(opt[at]||"");
+  }
+
+  function isBarre(v){
+    var seen={},bar=false;
+    for(var i=0;i<v.frets.length;i++){
+      if(v.frets[i]===0) continue;
+      if(seen[v.frets[i]]) bar=true;
+      seen[v.frets[i]]=1;
+    }
+    return bar;
   }
 
   function spell(def){
@@ -511,8 +553,44 @@
     var vlist=null,vv=null;
     if(state.mode==="triad"){
       vlist=state.voiceList&&state.voiceList.length?state.voiceList:voicings();
-      vv=vlist[Math.min(state.voiceIdx,vlist.length-1)]||null;
+      if(!state.edit){
+        var base=vlist[Math.min(state.voiceIdx,vlist.length-1)];
+        if(base) state.edit={strings:base.strings.slice(),frets:base.frets.slice(),
+                             inv:base.inv,min:base.min,bass:base.bass};
+      }
+      vv=state.edit;
     }
+
+    /* Every place the selected tone can live — including strings another
+       voice currently occupies, since relocating that one is often the move. */
+    var offscreen=0;
+    if(state.mode==="triad" && vv && state.sel>=0){
+      var selStr=vv.strings[state.sel];
+      var selPc=(STRINGS[selStr].pc+vv.frets[state.sel])%12;
+      var selMidi=STRINGS[selStr].midi+vv.frets[state.sel];
+      STRINGS.forEach(function(s2,i2){
+        for(var f2=0;f2<=24;f2++){
+          if((s2.pc+f2)%12!==selPc) continue;
+          if(i2===selStr && f2===vv.frets[state.sel]) continue;
+          var visible=(f2>=(LO()===0?0:LO()+1) && f2<=HI());
+          if(!visible){ offscreen++; continue; }
+          var taken=vv.strings.indexOf(i2);
+          var conflict=(taken>=0 && taken!==state.sel);
+          var gx=f2===0?NUT_X-24:(fretX(f2-1)+fretX(f2))/2;
+          var gy=TOP_Y+i2*STR_GAP;
+          var exact=(s2.midi+f2)===selMidi;
+          g+='<circle class="gh" data-si="'+i2+'" data-f="'+f2+'" cx="'+gx+'" cy="'+gy+
+             '" r="13" fill="'+(conflict?"rgba(192,138,46,.08)":"rgba(192,138,46,.18)")+
+             '" stroke="#C08A2E" stroke-width="'+(exact?2.5:1.2)+
+             '" stroke-dasharray="'+(exact?"":"3 3")+'" opacity="'+(conflict?".55":"1")+'"/>';
+          var gl=map[selPc]?(state.names?map[selPc].note:map[selPc].deg):"";
+          g+='<text class="gh" data-si="'+i2+'" data-f="'+f2+'" x="'+gx+'" y="'+(gy+4)+
+             '" fill="#C08A2E" font-family="IBM Plex Mono, monospace" font-size="'+
+             (gl.length>2?9:11)+'" text-anchor="middle" opacity="'+(conflict?".55":"1")+'">'+gl+'</text>';
+        }
+      });
+    }
+    state.offscreen=offscreen;
 
     STRINGS.forEach(function(s,i){
       var y=TOP_Y+i*STR_GAP;
@@ -527,10 +605,12 @@
         var pcv=(s.pc+vf)%12;
         var hitv=map[pcv];
         var isR=hitv && hitv.deg==="1";
-        g+='<circle class="nt" data-m="'+(s.midi+vf)+'" cx="'+vx+'" cy="'+y+'" r="15" fill="'+
-           (isR?"#C08A2E":"#E3DCCB")+'"/>';
+        var picked=(state.sel===j);
+        g+='<circle class="nt vc" data-v="'+j+'" data-m="'+(s.midi+vf)+'" cx="'+vx+'" cy="'+y+
+           '" r="15" fill="'+(isR?"#C08A2E":"#E3DCCB")+'"'+
+           (picked?' stroke="#17120F" stroke-width="3.5"':'')+'/>';
         var lab=hitv?(state.names?hitv.note:hitv.deg):"";
-        g+='<text x="'+vx+'" y="'+(y+4)+'" fill="'+(isR?"#14100C":"#17120F")+
+        g+='<text class="vc" data-v="'+j+'" x="'+vx+'" y="'+(y+4)+'" fill="'+(isR?"#14100C":"#17120F")+
            '" font-family="IBM Plex Mono, monospace" font-size="'+(lab.length>2?9:11)+
            '" font-weight="600" text-anchor="middle">'+lab+'</text>';
         var fg=fingerFor(vv,j);
@@ -567,9 +647,17 @@
         parts.push(STRINGS[vv.strings[q]].name+" str · fr "+vv.frets[q]+
                    (fingerFor(vv,q)?" · finger "+fingerFor(vv,q):""));
       }
+      var pressedNow=vv.frets.filter(function(f){return f>0;});
+      var stretch=pressedNow.length?Math.max.apply(null,pressedNow)-Math.min.apply(null,pressedNow):0;
       var invLabel=(vv.bass==="1")?"root position":(vv.bass+" in the bass");
+      var warn=stretch>=4?' <span style="color:#C08A2E">wide</span>':"";
+      var hint=state.sel>=0
+        ? '<br><span style="color:#C08A2E">tap a ringed position to move this note</span>'
+          +(state.offscreen?'<br><span style="color:#8A806E">'+state.offscreen+
+            ' more outside this fret range — switch to Whole neck</span>':'')
+        : '<br><span style="color:#8A806E">tap a note to move it</span>';
       document.getElementById("formula").innerHTML=
-        invLabel+"<br>"+parts.reverse().join("<br>");
+        invLabel+" · "+stretch+" fret stretch"+warn+"<br>"+parts.reverse().join("<br>")+hint;
     }else{
       document.getElementById("formula").textContent=def.d.join("  ·  ");
     }
@@ -588,7 +676,7 @@
     var rb=document.getElementById("roots");rb.innerHTML="";
     ROOTS.forEach(function(r,i){
       rb.appendChild(chip(state.sharps?r.sharp:r.flat,i===state.rootIdx,function(){
-        state.rootIdx=i;renderChips();draw();
+        state.rootIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;renderChips();draw();
       }));
     });
 
@@ -619,7 +707,7 @@
       var box2=document.createElement("div");box2.className="chips";
       fam.items.forEach(function(it,ii){
         box2.appendChild(chip(it.n,state.mode==="triad"&&state.shape[0]===fi&&state.shape[1]===ii,function(){
-          state.mode="triad";state.shape=[fi,ii];state.voiceIdx=0;
+          state.mode="triad";state.shape=[fi,ii];state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;
           syncMode();renderChips();draw();
         }));
       });
@@ -641,11 +729,36 @@
         if(state.voiceIdx>=vs.length) state.voiceIdx=0;
         vs.forEach(function(v,i){
           var sn=v.strings.map(function(si){return STRINGS[si].name;}).reverse().join("-");
-          var label=sn+" · fr "+v.min+" · "+(v.bass==="1"?"root":v.bass+" bass");
+          var label=sn+" · fr "+v.min+" · "+(v.bass==="1"?"root":v.bass+" bass")+" · "+(v.span||0)+"fr";
           vb.appendChild(chip(label,state.voiceIdx===i,function(){
-            state.voiceIdx=i;renderChips();draw();
+            state.voiceIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;renderChips();draw();
           },"sans-chip"));
         });
+      }
+    }
+
+    var fb2=document.getElementById("fingerSets");fb2.innerHTML="";
+    if(state.mode==="triad"){
+      var cur=state.edit;
+      if(cur){
+        var opts=fingerOptions(cur);
+        if(state.fingerIdx>=opts.length) state.fingerIdx=0;
+        opts.forEach(function(o,i){
+          if(!o.length) return;
+          fb2.appendChild(chip(o.join("-"),state.fingerIdx===i,function(){
+            state.fingerIdx=i;renderChips();draw();
+          }));
+        });
+        fb2.appendChild(chip("Reset shape",false,function(){
+          state.edit=null;state.sel=-1;state.fingerIdx=0;renderChips();draw();
+        },"sans-chip"));
+        if(isBarre(cur)){
+          var note=document.createElement("span");
+          note.className="lbl";
+          note.style.marginLeft="6px";
+          note.textContent="barre — one finger covers two strings";
+          fb2.appendChild(note);
+        }
       }
     }
   }
@@ -662,7 +775,7 @@
 
   document.getElementById("mode-scale").addEventListener("click",function(){state.mode="scale";syncMode();renderChips();draw();});
   document.getElementById("mode-chord").addEventListener("click",function(){state.mode="chord";syncMode();renderChips();draw();});
-  document.getElementById("mode-triad").addEventListener("click",function(){state.mode="triad";state.voiceIdx=0;syncMode();renderChips();draw();});
+  document.getElementById("mode-triad").addEventListener("click",function(){state.mode="triad";state.voiceIdx=0;state.edit=null;state.sel=-1;syncMode();renderChips();draw();});
   document.getElementById("tgl-names").addEventListener("click",function(){state.names=true;state.degs=false;syncDisp();draw();});
   document.getElementById("tgl-degs").addEventListener("click",function(){state.degs=true;state.names=false;syncDisp();draw();});
   document.getElementById("tgl-acc").addEventListener("click",function(){state.sharps=!state.sharps;syncDisp();renderChips();draw();});
@@ -747,9 +860,40 @@
   }
 
   document.getElementById("fb").addEventListener("click",function(e){
-    if(!tapOn) return;
     var t=e.target;
     if(!t || t.getAttribute===undefined) return;
+
+    /* moving a voice to an alternate position */
+    var si=t.getAttribute("data-si");
+    if(si!==null && state.mode==="triad" && state.edit && state.sel>=0){
+      var nf=+t.getAttribute("data-f");
+      var nsi=+si;
+      var displaced=state.edit.strings.indexOf(nsi);
+      if(displaced===state.sel) displaced=-1;
+      state.edit.strings[state.sel]=nsi;
+      state.edit.frets[state.sel]=nf;
+      state.edit.min=Math.min.apply(null,state.edit.frets);
+      state.fingerIdx=0;
+      pluck(STRINGS[nsi].midi+nf);
+      /* the voice that was on that string now needs a home — select it */
+      state.sel=(displaced>=0)?displaced:-1;
+      renderChips();draw();
+      return;
+    }
+
+    /* selecting a voice to move */
+    var vi=t.getAttribute("data-v");
+    if(vi!==null && state.mode==="triad"){
+      state.sel=(state.sel===+vi)?-1:+vi;
+      renderChips();draw();
+      if(state.sel>=0 && tapOn){
+        var vs2=state.edit;
+        pluck(STRINGS[vs2.strings[state.sel]].midi+vs2.frets[state.sel]);
+      }
+      return;
+    }
+
+    if(!tapOn) return;
     var m=t.getAttribute("data-m");
     if(m===null) return;
     pluck(+m);
@@ -1020,7 +1164,7 @@
     rangeBox.innerHTML="";
     RANGES.forEach(function(r,i){
       rangeBox.appendChild(chip(r.n,i===rangeIdx,function(){
-        rangeIdx=i;state.voiceIdx=0;renderRanges();renderChips();draw();
+        rangeIdx=i;state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;renderRanges();renderChips();draw();
       },"sans-chip"));
     });
   }
