@@ -137,6 +137,8 @@
     <div id="shapeGroups"></div>
     <div class="row"><span class="lbl">Fingering</span><div class="chips" id="voicings"></div></div>
     <div class="row"><span class="lbl">Fingers</span><div class="chips" id="fingerSets"></div></div>
+    <div class="row"><span class="lbl">My shapes</span><div class="chips" id="shapeLib"></div></div>
+    <div class="row"><span class="lbl">Saved progressions</span><div class="chips" id="progLib"></div></div>
   </div>
 
   <div class="row">
@@ -153,7 +155,11 @@
     <div class="chips" id="ranges"></div>
   </div>
 
+  <div class="row" id="abrow" style="margin-bottom:8px"></div>
+
   <div class="board"><svg id="fb" viewBox="0 0 1000 268" role="img" aria-label="Fretboard diagram"></svg></div>
+
+  <div class="row" id="fingerNow" style="margin:-8px 0 18px"></div>
 
   <div class="readout">
     <div class="cell"><span class="lbl">Notes</span><div class="spell" id="spelling"></div></div>
@@ -202,6 +208,12 @@
     </div>
   </div>
 
+
+  <div style="border-top:1px solid var(--rule);margin-top:26px;padding-top:16px;
+              display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="sans-chip" id="clearcache">Refresh app</button>
+    <span class="lbl">clears the offline copy and reloads the newest version</span>
+  </div>
 </div>
 
 <script>
@@ -348,10 +360,213 @@
   ];
 
   const state={rootIdx:0,mode:"scale",scaleIdx:0,chord:[0,0],shape:[0,0],voiceIdx:0,fingerIdx:0,
-               edit:null,sel:-1,
+               edit:null,sel:-1,savedIdx:-1,viewIdx:-1,libIdx:-1,naming:false,namingValue:"",progSel:null,
                names:true,degs:false,sharps:false};
 
   function shapeDef(){ return SHAPE_FAMILIES[state.shape[0]].items[state.shape[1]]; }
+
+  /* ---- naming whatever is actually under the fingers ---- */
+  const FORMULAS=[
+    {n:"5",iv:[0,7]},
+    {n:"",iv:[0,4,7]},            {n:"m",iv:[0,3,7]},
+    {n:"dim",iv:[0,3,6]},         {n:"aug",iv:[0,4,8]},
+    {n:"sus2",iv:[0,2,7]},        {n:"sus4",iv:[0,5,7]},
+    {n:"6",iv:[0,4,7,9]},         {n:"m6",iv:[0,3,7,9]},
+    {n:"maj7",iv:[0,4,7,11]},     {n:"7",iv:[0,4,7,10]},
+    {n:"m7",iv:[0,3,7,10]},       {n:"m7♭5",iv:[0,3,6,10]},
+    {n:"dim7",iv:[0,3,6,9]},      {n:"m(maj7)",iv:[0,3,7,11]},
+    {n:"maj7♯5",iv:[0,4,8,11]},   {n:"7♯5",iv:[0,4,8,10]},
+    {n:"7♭5",iv:[0,4,6,10]},      {n:"7sus4",iv:[0,5,7,10]},
+    {n:"add9",iv:[0,2,4,7]},      {n:"m add9",iv:[0,2,3,7]},
+    {n:"6/9",iv:[0,2,4,7,9]},     {n:"m6/9",iv:[0,2,3,7,9]},
+    {n:"maj9",iv:[0,2,4,7,11]},   {n:"9",iv:[0,2,4,7,10]},
+    {n:"m9",iv:[0,2,3,7,10]},     {n:"m(maj9)",iv:[0,2,3,7,11]},
+    {n:"7♭9",iv:[0,1,4,7,10]},    {n:"7♯9",iv:[0,3,4,7,10]},
+    {n:"9sus4",iv:[0,2,5,7,10]},  {n:"m9♭5",iv:[0,2,3,6,10]},
+    {n:"11",iv:[0,2,5,7,10]},     {n:"m11",iv:[0,2,3,5,7,10]},
+    {n:"maj7♯11",iv:[0,4,6,7,11]},{n:"7♯11",iv:[0,4,6,7,10]},
+    {n:"13",iv:[0,2,4,7,9,10]},   {n:"maj13",iv:[0,2,4,7,9,11]},
+    {n:"m13",iv:[0,2,3,7,9,10]},  {n:"13sus4",iv:[0,2,5,7,9,10]},
+    {n:"maj7sus4",iv:[0,5,7,11]}, {n:"maj7sus2",iv:[0,2,7,11]},
+    {n:"7sus2",iv:[0,2,7,10]},    {n:"m7sus4",iv:[0,5,7,10]},
+    {n:"dim(maj7)",iv:[0,3,6,11]},{n:"add4",iv:[0,4,5,7]},
+    {n:"m add4",iv:[0,3,5,7]},    {n:"maj7♭5",iv:[0,4,6,11]},
+    {n:"m7♭9",iv:[0,1,3,7,10]},   {n:"sus2sus4",iv:[0,2,5,7]},
+    {n:"6sus4",iv:[0,5,7,9]},     {n:"aug7♭9",iv:[0,1,4,8,10]}
+  ];
+  const IVNAME={0:"unison",1:"♭2",2:"2nd",3:"♭3",4:"3rd",5:"4th",6:"tritone",
+                7:"5th",8:"♭6",9:"6th",10:"♭7",11:"7th"};
+
+  const DEGNAME=["1","♭2","2","♭3","3","4","♭5","5","♭6","6","♭7","7"];
+  function degFrom(rootPc,pc){
+    return DEGNAME[(((pc-rootPc)%12)+12)%12];
+  }
+
+  function pcName(pc){
+    return state.sharps?ROOTS[((pc%12)+12)%12].sharp:ROOTS[((pc%12)+12)%12].flat;
+  }
+
+  /* Given the sounding pitches, work out what the chord is now called. */
+  function identify(midis){
+    if(!midis.length) return null;
+    var pcs=[],seen={};
+    midis.forEach(function(m){ var p=((m%12)+12)%12; if(!seen[p]){seen[p]=1;pcs.push(p);} });
+    var bassPc=((Math.min.apply(null,midis))%12+12)%12;
+
+    if(pcs.length===1) return {name:pcName(pcs[0])+" (single note)",exact:true,rootPc:pcs[0]};
+    if(pcs.length===2){
+      var a=pcs[0],b=pcs[1];
+      var iv=Math.min(((b-a)%12+12)%12,((a-b)%12+12)%12);
+      for(var r2=0;r2<FORMULAS.length;r2++){
+        if(FORMULAS[r2].iv.length!==2) continue;
+      }
+      if(iv===7) return {name:pcName(bassPc)+"5",exact:true,rootPc:bassPc};
+      return {name:pcName(bassPc)+" + "+IVNAME[iv],exact:false,loose:true,rootPc:bassPc};
+    }
+
+    var best=null;
+    for(var r=0;r<12;r++){
+      var ivs=pcs.map(function(p){return ((p-r)%12+12)%12;}).sort(function(x,y){return x-y;});
+      if(ivs[0]!==0) continue;
+      for(var i=0;i<FORMULAS.length;i++){
+        var f=FORMULAS[i];
+        var exact=(ivs.length===f.iv.length && ivs.every(function(v,k){return v===f.iv[k];}));
+        var subset=ivs.every(function(v){return f.iv.indexOf(v)>=0;});
+        if(!exact && !subset) continue;
+        var missing=f.iv.filter(function(v){return ivs.indexOf(v)<0;});
+        var score=(exact?0:100)+missing.length*10+f.iv.length+(r===bassPc?0:1);
+        if(!best || score<best.score){
+          best={score:score,root:r,f:f,missing:missing,exact:exact};
+        }
+      }
+    }
+    if(!best) return {name:"no standard name",exact:false,loose:true,rootPc:bassPc};
+
+    var nm=pcName(best.root)+best.f.n;
+    if(best.root!==bassPc) nm+="/"+pcName(bassPc);
+    var omit="";
+    if(best.missing.length){
+      omit=" no "+best.missing.map(function(v){
+        return {2:"9th",4:"3rd",5:"11th",7:"5th",9:"13th",10:"♭7",11:"7th",3:"♭3",6:"♭5",8:"♯5"}[v]||v;
+      }).join(", ");
+    }
+    return {name:nm,exact:best.exact,omit:omit,rootPc:best.root};
+  }
+
+  /* Shapes you have adjusted and kept. Stored on this device only;
+     wrapped because some sandboxes block storage. */
+  /* A progression is an ordered list of shapes. The chord before the one
+     you are working on is the reference: fingerings get ranked by how
+     little the hand has to move from it. */
+  var PROG=[];
+  var PROG_KEY="fretboard.prog.v1";
+  function loadProg(){
+    try{ var raw=window.localStorage.getItem(PROG_KEY); if(raw) PROG=JSON.parse(raw)||[]; }
+    catch(e){}
+  }
+  function persistProg(){
+    try{ window.localStorage.setItem(PROG_KEY,JSON.stringify(PROG)); }catch(e){}
+  }
+  function addToProg(){
+    if(!state.edit) return;
+    PROG.push({name:(liveName||"chord"),
+               strings:state.edit.strings.slice(),
+               frets:state.edit.frets.slice(),
+               fingers:(state.edit.fingers||[]).slice(),
+               min:Math.min.apply(null,state.edit.frets)});
+    persistProg();
+  }
+  /* Which shape the next chord is measured against. */
+  function anchorRef(){
+    if(state.viewIdx>0) return PROG[state.viewIdx-1];
+    if(state.viewIdx===0) return null;
+    return PROG.length?PROG[PROG.length-1]:null;
+  }
+  function anchorCost(v){
+    var a=anchorRef();
+    if(!a) return {cost:0,common:0,shift:0,move:0};
+    var common=0,move=0;
+    for(var i=0;i<v.strings.length;i++){
+      var best=99;
+      for(var k=0;k<a.strings.length;k++){
+        if(a.strings[k]===v.strings[i] && a.frets[k]===v.frets[i]){ best=0; break; }
+        var d=Math.abs(a.frets[k]-v.frets[i])+(a.strings[k]===v.strings[i]?0:1);
+        if(d<best) best=d;
+      }
+      if(best===0) common++;
+      move+=best;
+    }
+    var posShift=Math.abs(v.min-a.min);
+    var pressed=v.frets.filter(function(f){return f>0;});
+    var stretch=pressed.length?Math.max.apply(null,pressed)-Math.min.apply(null,pressed):0;
+    return {cost:posShift*2.5+move+(v.strings.length-common)*1.5+stretch*0.5,
+            common:common,shift:posShift,move:move};
+  }
+  function staysPut(si,fr){
+    var a=anchorRef();
+    if(!a) return false;
+    for(var k=0;k<a.strings.length;k++){
+      if(a.strings[k]===si && a.frets[k]===fr) return true;
+    }
+    return false;
+  }
+
+  /* A shape library that is not tied to a chord type, so anything you
+     keep can be pulled into any progression later. */
+  var SHAPES=[];
+  var SHAPES_KEY="fretboard.shapelib.v1";
+  function loadShapes(){
+    try{ var r=window.localStorage.getItem(SHAPES_KEY); if(r) SHAPES=JSON.parse(r)||[]; }catch(e){}
+  }
+  function persistShapes(){
+    try{ window.localStorage.setItem(SHAPES_KEY,JSON.stringify(SHAPES)); }catch(e){}
+  }
+
+  /* Named progressions. */
+  var PROGLIB={};
+  var PROGLIB_KEY="fretboard.proglib.v1";
+  function loadProgLib(){
+    try{ var r=window.localStorage.getItem(PROGLIB_KEY); if(r) PROGLIB=JSON.parse(r)||{}; }catch(e){}
+  }
+  function persistProgLib(){
+    try{ window.localStorage.setItem(PROGLIB_KEY,JSON.stringify(PROGLIB)); }catch(e){}
+  }
+
+  var liveName="";
+  var SAVED={};
+  var SAVE_KEY="fretboard.shapes.v1";
+  function loadSaved(){
+    try{ var raw=window.localStorage.getItem(SAVE_KEY); if(raw) SAVED=JSON.parse(raw)||{}; }
+    catch(e){}
+  }
+  function persistSaved(){
+    try{ window.localStorage.setItem(SAVE_KEY,JSON.stringify(SAVED)); }catch(e){}
+  }
+  function shapeKey(){
+    return state.rootIdx+"|"+state.shape[0]+"|"+state.shape[1];
+  }
+  function savedHere(){ return SAVED[shapeKey()]||[]; }
+  function saveCurrent(){
+    if(!state.edit) return;
+    var list=savedHere().slice();
+    var rec={strings:state.edit.strings.slice(),frets:state.edit.frets.slice(),
+             bass:state.edit.bass,min:Math.min.apply(null,state.edit.frets),
+             fingerIdx:state.fingerIdx,
+             fingers:(state.edit.fingers||[]).slice()};
+    var sig=rec.strings.join(",")+":"+rec.frets.join(",");
+    for(var i=0;i<list.length;i++){
+      if(list[i].strings.join(",")+":"+list[i].frets.join(",")===sig) return;
+    }
+    list.push(rec);
+    SAVED[shapeKey()]=list;
+    persistSaved();
+  }
+  function deleteSaved(i){
+    var list=savedHere().slice();
+    list.splice(i,1);
+    if(list.length) SAVED[shapeKey()]=list; else delete SAVED[shapeKey()];
+    persistSaved();
+  }
 
   function current(){
     if(state.mode==="scale") return SCALES[state.scaleIdx];
@@ -458,6 +673,8 @@
 
   function fingerFor(v,j){
     if(v.frets[j]===0) return "0";
+    /* an explicit choice always wins — same-fret notes need not share a finger */
+    if(v.fingers && v.fingers[j]) return String(v.fingers[j]);
     var fs=pressedFrets(v);
     var opts=fingerOptions(v);
     var opt=opts[Math.min(state.fingerIdx,opts.length-1)]||[];
@@ -466,11 +683,13 @@
   }
 
   function isBarre(v){
-    var seen={},bar=false;
+    var byFinger={},bar=false;
     for(var i=0;i<v.frets.length;i++){
       if(v.frets[i]===0) continue;
-      if(seen[v.frets[i]]) bar=true;
-      seen[v.frets[i]]=1;
+      var f=fingerFor(v,i);
+      if(!f) continue;
+      if(byFinger[f]) bar=true;
+      byFinger[f]=1;
     }
     return bar;
   }
@@ -536,6 +755,8 @@
     }
     if(LO()===0)
       g+='<rect x="'+(NUT_X-5)+'" y="'+(TOP_Y-16)+'" width="5" height="'+(STR_GAP*5+32)+'" fill="#C9C2B0" opacity=".85" rx="1"/>';
+    else
+      g+='<text x="'+(NUT_X-26)+'" y="'+(TOP_Y-22)+'" fill="#A39B8A" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle">open</text>';
 
     STRINGS.forEach(function(s,i){
       var y=TOP_Y+i*STR_GAP;
@@ -559,6 +780,9 @@
                              inv:base.inv,min:base.min,bass:base.bass};
       }
       vv=state.edit;
+      if(state.viewIdx>=0 && PROG[state.viewIdx]){
+        vv=activeShape();
+      }
     }
 
     /* Every place the selected tone can live — including strings another
@@ -568,22 +792,33 @@
       var selStr=vv.strings[state.sel];
       var selPc=(STRINGS[selStr].pc+vv.frets[state.sel])%12;
       var selMidi=STRINGS[selStr].midi+vv.frets[state.sel];
+      /* Every fret on the neck is a target. Places that keep the chord tone
+         are drawn large and labelled; everywhere else is a small dot that
+         will change the chord — which is the point. */
       STRINGS.forEach(function(s2,i2){
         for(var f2=0;f2<=24;f2++){
-          if((s2.pc+f2)%12!==selPc) continue;
           if(i2===selStr && f2===vv.frets[state.sel]) continue;
-          var visible=(f2>=(LO()===0?0:LO()+1) && f2<=HI());
-          if(!visible){ offscreen++; continue; }
+          var visible=(f2===0)||(f2>=(LO()===0?0:LO()+1) && f2<=HI());
+          if(!visible) continue;
+          var gpc=(s2.pc+f2)%12;
+          var sameTone=(gpc===selPc);
           var taken=vv.strings.indexOf(i2);
           var conflict=(taken>=0 && taken!==state.sel);
-          var gx=f2===0?NUT_X-24:(fretX(f2-1)+fretX(f2))/2;
+          var gx=f2===0?NUT_X-26:(fretX(f2-1)+fretX(f2))/2;
           var gy=TOP_Y+i2*STR_GAP;
+
+          if(!sameTone){
+            g+='<circle class="gh" data-si="'+i2+'" data-f="'+f2+'" cx="'+gx+'" cy="'+gy+
+               '" r="10" fill="rgba(227,220,203,.10)" stroke="#6E6A5F" stroke-width="1" '+
+               'opacity="'+(conflict?".35":".7")+'"/>';
+            continue;
+          }
           var exact=(s2.midi+f2)===selMidi;
           g+='<circle class="gh" data-si="'+i2+'" data-f="'+f2+'" cx="'+gx+'" cy="'+gy+
              '" r="13" fill="'+(conflict?"rgba(192,138,46,.08)":"rgba(192,138,46,.18)")+
              '" stroke="#C08A2E" stroke-width="'+(exact?2.5:1.2)+
              '" stroke-dasharray="'+(exact?"":"3 3")+'" opacity="'+(conflict?".55":"1")+'"/>';
-          var gl=map[selPc]?(state.names?map[selPc].note:map[selPc].deg):"";
+          var gl=state.names?pcName(gpc):degFrom(liveId?liveId.rootPc:ROOTS[state.rootIdx].pc,gpc);
           g+='<text class="gh" data-si="'+i2+'" data-f="'+f2+'" x="'+gx+'" y="'+(gy+4)+
              '" fill="#C08A2E" font-family="IBM Plex Mono, monospace" font-size="'+
              (gl.length>2?9:11)+'" text-anchor="middle" opacity="'+(conflict?".55":"1")+'">'+gl+'</text>';
@@ -592,33 +827,77 @@
     }
     state.offscreen=offscreen;
 
-    STRINGS.forEach(function(s,i){
-      var y=TOP_Y+i*STR_GAP;
+    /* The shape you are NOT looking at, drawn as an outline so the
+       hand movement between the two is visible at a glance. */
+    if(state.mode==="triad" && vv){
+      var other = anchorRef();
+      if(other){
+        for(var oi=0;oi<other.strings.length;oi++){
+          var of=other.frets[oi], osi=other.strings[oi];
+          var openO=(of===0);
+          if(!openO && (of<(LO()===0?0:LO()+1) || of>HI())) continue;
+          var same=false;
+          for(var ci=0;ci<vv.strings.length;ci++){
+            if(vv.strings[ci]===osi && vv.frets[ci]===of){ same=true; break; }
+          }
+          if(same) continue;                     /* already drawn solid */
+          var ox=openO?NUT_X-26:(fretX(of-1)+fretX(of))/2;
+          var oy=TOP_Y+osi*STR_GAP;
+          var opc=(STRINGS[osi].pc+of)%12;
+          g+='<circle cx="'+ox+'" cy="'+oy+'" r="14" fill="none" stroke="#2F7D62" '+
+             'stroke-width="2" stroke-dasharray="4 3" opacity=".75"/>';
+          g+='<text x="'+ox+'" y="'+(oy+4)+'" fill="#2F7D62" opacity=".85" '+
+             'font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle">'+
+             (state.names?pcName(opc):degFrom(liveId?liveId.rootPc:ROOTS[state.rootIdx].pc,opc))+
+             '</text>';
+        }
+      }
+    }
 
-      if(state.mode==="triad"){
-        if(!vv) return;
-        var j=vv.strings.indexOf(i);
-        if(j<0) return;
+    /* Draw one dot per voice, not one per string — two voices can sit on
+       the same string mid-edit and both must stay visible. */
+    var outOfView=0;
+    var liveId=null;
+    if(state.mode==="triad" && vv){
+      var soundNow=[];
+      for(var q0=0;q0<vv.strings.length;q0++) soundNow.push(STRINGS[vv.strings[q0]].midi+vv.frets[q0]);
+      liveId=identify(soundNow);
+      var stringUse={};
+      vv.strings.forEach(function(si){ stringUse[si]=(stringUse[si]||0)+1; });
+      for(var j=0;j<vv.strings.length;j++){
+        var s=STRINGS[vv.strings[j]];
+        var y=TOP_Y+vv.strings[j]*STR_GAP;
         var vf=vv.frets[j];
-        if(vf<(LO()===0?0:LO()+1) || vf>HI()) return;
-        var vx=vf===0?NUT_X-24:(fretX(vf-1)+fretX(vf))/2;
+        var openStr=(vf===0);
+        if(!openStr && (vf<(LO()===0?0:LO()+1) || vf>HI())){ outOfView++; continue; }
+        var vx=openStr?NUT_X-26:(fretX(vf-1)+fretX(vf))/2;
         var pcv=(s.pc+vf)%12;
-        var hitv=map[pcv];
-        var isR=hitv && hitv.deg==="1";
+        var isR=liveId && pcv===liveId.rootPc;
         var picked=(state.sel===j);
-        g+='<circle class="nt vc" data-v="'+j+'" data-m="'+(s.midi+vf)+'" cx="'+vx+'" cy="'+y+
+        var clash=stringUse[vv.strings[j]]>1;
+        var held=staysPut(vv.strings[j],vf);
+        /* nudge stacked voices apart so neither hides the other */
+        var dy=clash?(j%2===0?-7:7):0;
+        g+='<circle class="nt vc" data-v="'+j+'" data-m="'+(s.midi+vf)+'" cx="'+vx+'" cy="'+(y+dy)+
            '" r="15" fill="'+(isR?"#C08A2E":"#E3DCCB")+'"'+
-           (picked?' stroke="#17120F" stroke-width="3.5"':'')+'/>';
-        var lab=hitv?(state.names?hitv.note:hitv.deg):"";
-        g+='<text class="vc" data-v="'+j+'" x="'+vx+'" y="'+(y+4)+'" fill="'+(isR?"#14100C":"#17120F")+
+           (picked?' stroke="#17120F" stroke-width="3.5"'
+                  :(clash?' stroke="#B4462A" stroke-width="3"'
+                  :(held?' stroke="#2F7D62" stroke-width="3"':'')))+'/>';
+        var lab=state.names?pcName(pcv):degFrom(liveId?liveId.rootPc:ROOTS[state.rootIdx].pc,pcv);
+        g+='<text class="vc" data-v="'+j+'" x="'+vx+'" y="'+(y+dy+4)+'" fill="'+(isR?"#14100C":"#17120F")+
            '" font-family="IBM Plex Mono, monospace" font-size="'+(lab.length>2?9:11)+
            '" font-weight="600" text-anchor="middle">'+lab+'</text>';
         var fg=fingerFor(vv,j);
-        if(fg) g+='<text x="'+(vx+17)+'" y="'+(y-10)+'" fill="#C08A2E" '+
+        if(fg) g+='<text x="'+(vx+17)+'" y="'+(y+dy-10)+'" fill="#C08A2E" '+
                   'font-family="IBM Plex Mono, monospace" font-size="11" font-weight="700" '+
                   'text-anchor="middle">'+fg+'</text>';
-        return;
       }
+    }
+    state.outOfView=outOfView;
+
+    STRINGS.forEach(function(s,i){
+      if(state.mode==="triad") return;
+      var y=TOP_Y+i*STR_GAP;
 
       for(var f=(LO()===0?0:LO()+1);f<=HI();f++){
         var hit=map[(s.pc+f)%12];
@@ -640,7 +919,28 @@
     });
 
     document.getElementById("fb").innerHTML=g;
-    document.getElementById("spelling").innerHTML=notes.map(function(n,i){return i===0?'<span class="r">'+n+'</span>':n;}).join("  ·  ");
+    if(state.mode==="triad") renderFingerNow();
+
+    if(state.mode==="triad" && vv){
+      var sounding=[];
+      for(var mi=0;mi<vv.strings.length;mi++){
+        sounding.push(STRINGS[vv.strings[mi]].midi+vv.frets[mi]);
+      }
+      var id=identify(sounding);
+      var pcsOrdered=sounding.slice().sort(function(a,b){return a-b;})
+        .map(function(m){return pcName(m%12);});
+      var uniq=[],sn={};
+      pcsOrdered.forEach(function(n){ if(!sn[n]){sn[n]=1;uniq.push(n);} });
+      var head=id?id.name:"";
+      liveName=head;
+      var tail=(id&&id.omit)?'<span style="color:#8A806E;font-size:.8em">'+id.omit+'</span>':"";
+      var flag=(id&&!id.exact&&!id.omit&&!id.loose)?"":"";
+      document.getElementById("spelling").innerHTML=
+        '<span class="r" style="font-size:1.25em">'+head+'</span> '+tail+
+        '<br><span style="font-size:.9em">'+uniq.join("  ·  ")+'</span>';
+    }else{
+      document.getElementById("spelling").innerHTML=notes.map(function(n,i){return i===0?'<span class="r">'+n+'</span>':n;}).join("  ·  ");
+    }
     if(state.mode==="triad" && vv){
       var parts=[];
       for(var q=0;q<vv.strings.length;q++){
@@ -650,17 +950,36 @@
       var pressedNow=vv.frets.filter(function(f){return f>0;});
       var stretch=pressedNow.length?Math.max.apply(null,pressedNow)-Math.min.apply(null,pressedNow):0;
       var invLabel=(vv.bass==="1")?"root position":(vv.bass+" in the bass");
+      var anchorLine='';
+      var aRef=anchorRef();
+      if(aRef){
+        var held=0;
+        for(var hi=0;hi<vv.strings.length;hi++) if(staysPut(vv.strings[hi],vv.frets[hi])) held++;
+        anchorLine='<br><span style="color:#2F7D62">from '+esc2(aRef.name||"previous")+
+          ' · hand moves '+Math.abs(Math.min.apply(null,vv.frets)-aRef.min)+
+          ' fr'+(held?' · '+held+' finger(s) stay':'')+'</span>';
+      }
       var warn=stretch>=4?' <span style="color:#C08A2E">wide</span>':"";
-      var hint=state.sel>=0
-        ? '<br><span style="color:#C08A2E">tap a ringed position to move this note</span>'
-          +(state.offscreen?'<br><span style="color:#8A806E">'+state.offscreen+
-            ' more outside this fret range — switch to Whole neck</span>':'')
-        : '<br><span style="color:#8A806E">tap a note to move it</span>';
+      var stacked={},clashN=0;
+      vv.strings.forEach(function(si){ stacked[si]=(stacked[si]||0)+1; });
+      Object.keys(stacked).forEach(function(k){ if(stacked[k]>1) clashN++; });
+      var trouble='';
+      if(clashN) trouble+='<br><span style="color:#B4462A">two voices share a string — move one</span>';
+      if(state.outOfView) trouble+='<br><span style="color:#8A806E">'+state.outOfView+
+        ' note(s) outside this fret range</span>';
+      var hint=trouble+(state.sel>=0
+        ? '<br><span style="color:#C08A2E">tap any fret to move this note there</span>'
+          +'<br><span style="color:#8A806E">ringed spots keep the chord — plain dots change it</span>'
+        : '<br><span style="color:#8A806E">tap a note to move it</span>');
       document.getElementById("formula").innerHTML=
-        invLabel+" · "+stretch+" fret stretch"+warn+"<br>"+parts.reverse().join("<br>")+hint;
+        invLabel+" · "+stretch+" fret stretch"+warn+anchorLine+"<br>"+parts.reverse().join("<br>")+hint;
     }else{
       document.getElementById("formula").textContent=def.d.join("  ·  ");
     }
+  }
+
+  function esc2(t){
+    return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
   function chip(text,pressed,onClick,cls){
@@ -676,7 +995,7 @@
     var rb=document.getElementById("roots");rb.innerHTML="";
     ROOTS.forEach(function(r,i){
       rb.appendChild(chip(state.sharps?r.sharp:r.flat,i===state.rootIdx,function(){
-        state.rootIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;renderChips();draw();
+        state.rootIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;state.savedIdx=-1;state.viewIdx=-1;renderAB();renderChips();draw();
       }));
     });
 
@@ -707,8 +1026,8 @@
       var box2=document.createElement("div");box2.className="chips";
       fam.items.forEach(function(it,ii){
         box2.appendChild(chip(it.n,state.mode==="triad"&&state.shape[0]===fi&&state.shape[1]===ii,function(){
-          state.mode="triad";state.shape=[fi,ii];state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;
-          syncMode();renderChips();draw();
+          state.mode="triad";state.shape=[fi,ii];state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;state.savedIdx=-1;
+          state.viewIdx=-1;syncMode();renderAB();renderChips();draw();
         }));
       });
       wrap2.appendChild(h2);wrap2.appendChild(box2);sg.appendChild(wrap2);
@@ -723,19 +1042,47 @@
       });
       if(!vs.length && all.length) vs=all;   /* never leave the row empty */
       state.voiceList=vs;
+      if(anchorRef()){
+        vs=vs.slice().sort(function(a,b){
+          return anchorCost(a).cost-anchorCost(b).cost;
+        });
+        state.voiceList=vs;
+      }
+      var mine=savedHere();
+      mine.forEach(function(rec,i){
+        var sn2=rec.strings.map(function(si){return STRINGS[si].name;}).reverse().join("-");
+        var lab2="\u2605 "+sn2+" \u00b7 fr "+rec.min;
+        var picked=(state.savedIdx===i);
+        vb.appendChild(chip(lab2,picked,function(){
+          state.savedIdx=i;state.voiceIdx=-1;
+          state.edit={strings:rec.strings.slice(),frets:rec.frets.slice(),
+                      bass:rec.bass,min:rec.min,fingers:(rec.fingers||[]).slice()};
+          state.fingerIdx=rec.fingerIdx||0;state.sel=-1;
+          renderChips();draw();
+        },"sans-chip"));
+      });
       if(!vs.length){
-        vb.innerHTML='<span class="lbl">No shape fits on this neck</span>';
+        if(!mine.length) vb.innerHTML='<span class="lbl">No shape fits on this neck</span>';
       }else{
         if(state.voiceIdx>=vs.length) state.voiceIdx=0;
         vs.forEach(function(v,i){
           var sn=v.strings.map(function(si){return STRINGS[si].name;}).reverse().join("-");
           var label=sn+" · fr "+v.min+" · "+(v.bass==="1"?"root":v.bass+" bass")+" · "+(v.span||0)+"fr";
-          vb.appendChild(chip(label,state.voiceIdx===i,function(){
-            state.voiceIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;renderChips();draw();
+          if(anchorRef()){
+            var ac=anchorCost(v);
+            label+="  ·  shift "+ac.shift+(ac.common?", "+ac.common+" stay":"");
+          }
+          vb.appendChild(chip(label,state.voiceIdx===i&&state.savedIdx<0,function(){
+            state.voiceIdx=i;state.savedIdx=-1;state.fingerIdx=0;state.edit=null;state.sel=-1;
+            state.viewIdx=-1;renderAB();renderChips();draw();
           },"sans-chip"));
         });
       }
     }
+
+    renderShapeLib();
+    renderProgLib();
+    renderFingerNow();
 
     var fb2=document.getElementById("fingerSets");fb2.innerHTML="";
     if(state.mode==="triad"){
@@ -749,8 +1096,45 @@
             state.fingerIdx=i;renderChips();draw();
           }));
         });
+        fb2.appendChild(chip("Add to progression",false,function(){
+          addToProg();
+          state.viewIdx=-1;
+          renderAB();renderChips();draw();
+        },"sans-chip"));
+        if(PROG.length){
+          fb2.appendChild(chip("Remove last",false,function(){
+            PROG.pop();persistProg();
+            state.viewIdx=-1;renderAB();renderChips();draw();
+          },"sans-chip"));
+          fb2.appendChild(chip("Clear progression",false,function(){
+            PROG=[];persistProg();
+            state.viewIdx=-1;renderAB();renderChips();draw();
+          },"sans-chip"));
+        }
+        fb2.appendChild(chip("Keep shape",false,function(){
+          SHAPES.push({name:(liveName||"shape"),
+                       strings:state.edit.strings.slice(),
+                       frets:state.edit.frets.slice(),
+                       fingers:(state.edit.fingers||[]).slice(),
+                       min:Math.min.apply(null,state.edit.frets)});
+          persistShapes();
+          state.libIdx=SHAPES.length-1;
+          renderChips();draw();
+        },"sans-chip"));
+        fb2.appendChild(chip("Save shape",false,function(){
+          saveCurrent();
+          state.savedIdx=savedHere().length-1;
+          renderChips();draw();
+        },"sans-chip"));
+        if(state.savedIdx>=0){
+          fb2.appendChild(chip("Delete saved",false,function(){
+            deleteSaved(state.savedIdx);
+            state.savedIdx=-1;state.edit=null;state.sel=-1;state.voiceIdx=0;
+            renderChips();draw();
+          },"sans-chip"));
+        }
         fb2.appendChild(chip("Reset shape",false,function(){
-          state.edit=null;state.sel=-1;state.fingerIdx=0;renderChips();draw();
+          state.edit=null;state.sel=-1;state.fingerIdx=0;state.savedIdx=-1;renderChips();draw();
         },"sans-chip"));
         if(isBarre(cur)){
           var note=document.createElement("span");
@@ -773,9 +1157,9 @@
     document.getElementById("panel-triad").hidden=m!=="triad";
   }
 
-  document.getElementById("mode-scale").addEventListener("click",function(){state.mode="scale";syncMode();renderChips();draw();});
-  document.getElementById("mode-chord").addEventListener("click",function(){state.mode="chord";syncMode();renderChips();draw();});
-  document.getElementById("mode-triad").addEventListener("click",function(){state.mode="triad";state.voiceIdx=0;state.edit=null;state.sel=-1;syncMode();renderChips();draw();});
+  document.getElementById("mode-scale").addEventListener("click",function(){state.mode="scale";syncMode();renderAB();renderChips();draw();});
+  document.getElementById("mode-chord").addEventListener("click",function(){state.mode="chord";syncMode();renderAB();renderChips();draw();});
+  document.getElementById("mode-triad").addEventListener("click",function(){state.mode="triad";state.voiceIdx=0;state.edit=null;state.sel=-1;syncMode();renderAB();renderChips();draw();});
   document.getElementById("tgl-names").addEventListener("click",function(){state.names=true;state.degs=false;syncDisp();draw();});
   document.getElementById("tgl-degs").addEventListener("click",function(){state.degs=true;state.names=false;syncDisp();draw();});
   document.getElementById("tgl-acc").addEventListener("click",function(){state.sharps=!state.sharps;syncDisp();renderChips();draw();});
@@ -865,7 +1249,7 @@
 
     /* moving a voice to an alternate position */
     var si=t.getAttribute("data-si");
-    if(si!==null && state.mode==="triad" && state.edit && state.sel>=0){
+    if(si!==null && state.mode==="triad" && state.edit && state.sel>=0 && state.viewIdx<0){
       var nf=+t.getAttribute("data-f");
       var nsi=+si;
       var displaced=state.edit.strings.indexOf(nsi);
@@ -887,8 +1271,8 @@
       state.sel=(state.sel===+vi)?-1:+vi;
       renderChips();draw();
       if(state.sel>=0 && tapOn){
-        var vs2=state.edit;
-        pluck(STRINGS[vs2.strings[state.sel]].midi+vs2.frets[state.sel]);
+        var vs2=activeShape();
+        if(vs2) pluck(STRINGS[vs2.strings[state.sel]].midi+vs2.frets[state.sel]);
       }
       return;
     }
@@ -1159,12 +1543,257 @@
     });
   }
 
-  var rangeBox=document.getElementById("ranges");
+  function renderAB(){
+    var abBox=document.getElementById("abrow");
+    if(!abBox) return;
+    abBox.innerHTML="";
+    if(state.mode!=="triad" || !PROG.length){ abBox.style.display="none"; return; }
+    abBox.style.display="flex";
+    abBox.style.flexDirection="row";
+    abBox.style.alignItems="center";
+    abBox.style.flexWrap="wrap";
+    abBox.style.gap="8px";
+
+    var lab=document.createElement("span");
+    lab.className="lbl";
+    lab.textContent="Progression";
+    abBox.appendChild(lab);
+
+    var wrap=document.createElement("div");
+    wrap.className="chips";
+
+    wrap.appendChild(chip("\u25c0",false,function(){
+      var n=PROG.length;
+      if(state.viewIdx===-1) state.viewIdx=n-1;
+      else state.viewIdx=Math.max(0,state.viewIdx-1);
+      state.sel=-1;renderAB();renderChips();draw();
+    }));
+
+    /* Step chips always navigate. Copying is its own button, so the two
+       actions never depend on which mode you happen to be in. */
+    PROG.forEach(function(st,i){
+      wrap.appendChild(chip((i+1)+". "+st.name,state.viewIdx===i,function(){
+        state.viewIdx=i;state.sel=-1;renderAB();renderChips();draw();
+      },"sans-chip"));
+    });
+
+    wrap.appendChild(chip("Working",state.viewIdx===-1,function(){
+      state.viewIdx=-1;renderAB();renderChips();draw();
+    },"sans-chip"));
+
+    if(state.viewIdx===-1 && PROG.length){
+      wrap.appendChild(chip("Done \u2014 review",false,function(){
+        state.viewIdx=0;state.sel=-1;renderAB();renderChips();draw();
+      },"sans-chip"));
+    }
+
+    if(state.viewIdx>=0){
+      wrap.appendChild(chip("\uff0b Copy to end",false,function(){
+        var st=PROG[state.viewIdx];
+        PROG.push({name:st.name,strings:st.strings.slice(),
+                   frets:st.frets.slice(),min:st.min});
+        persistProg();
+        state.viewIdx=PROG.length-1;state.sel=-1;
+        renderAB();renderChips();draw();
+      }));
+    }
+
+    wrap.appendChild(chip("\u25b6",false,function(){
+      var n=PROG.length;
+      if(state.viewIdx===-1) state.viewIdx=0;
+      else if(state.viewIdx>=n-1) state.viewIdx=-1;
+      else state.viewIdx=state.viewIdx+1;
+      state.sel=-1;renderAB();renderChips();draw();
+    }));
+
+    abBox.appendChild(wrap);
+
+    var note=document.createElement("span");
+    note.className="lbl";
+    note.style.width="100%";
+    var working=(state.viewIdx===-1);
+    note.textContent=working
+      ? "tap a chord to view it \u00b7 Working is the shape you are building"
+      : "viewing a stored chord \u2014 tap Working to edit, or copy it to the end";
+    abBox.appendChild(note);
+  }
+
+  /* Per-note finger assignment, sitting right under the neck so it is
+     in view at the moment a note is tapped. */
+  /* Whatever shape is on the board right now — working shape or a stored
+     progression step. Fingering is editable on all of them. */
+  function activeShape(){
+    if(state.viewIdx>=0 && PROG[state.viewIdx]){
+      var st=PROG[state.viewIdx];
+      if(st.min===undefined) st.min=Math.min.apply(null,st.frets);
+      if(!st.bass) st.bass="1";
+      return st;
+    }
+    return state.edit;
+  }
+
+  function renderFingerNow(){
+    var box=document.getElementById("fingerNow");
+    if(!box) return;
+    box.innerHTML="";
+    if(state.mode!=="triad"){ box.style.display="none"; return; }
+    var cur=activeShape();
+    if(!cur){ box.style.display="none"; return; }
+    box.style.display="flex";
+    box.style.flexDirection="row";
+    box.style.alignItems="center";
+    box.style.flexWrap="wrap";
+    box.style.gap="8px";
+
+    var stored=(state.viewIdx>=0);
+    var picked=(state.sel>=0 && state.sel<cur.strings.length);
+
+    var lab=document.createElement("span");
+    lab.className="lbl";
+    lab.textContent=picked
+      ? ("Finger \u2014 "+STRINGS[cur.strings[state.sel]].name+" string, fr "+cur.frets[state.sel])
+      : "Finger \u2014 tap a note above";
+    box.appendChild(lab);
+
+    function setFinger(n){
+      if(!picked) return;
+      if(!cur.fingers) cur.fingers=[];
+      cur.fingers[state.sel]=(cur.fingers[state.sel]===n)?null:n;
+      if(stored) persistProg();
+      renderChips();draw();
+    }
+
+    var wrap=document.createElement("div");
+    wrap.className="chips";
+    [1,2,3,4].forEach(function(n){
+      var on=picked && cur.fingers && cur.fingers[state.sel]===n;
+      var b=chip(String(n),on,function(){ setFinger(n); });
+      if(!picked){ b.disabled=true; b.style.opacity=".4"; }
+      wrap.appendChild(b);
+    });
+    var ab=chip("Auto",picked && !(cur.fingers&&cur.fingers[state.sel]),function(){
+      if(!picked) return;
+      if(cur.fingers) cur.fingers[state.sel]=null;
+      if(stored) persistProg();
+      renderChips();draw();
+    },"sans-chip");
+    if(!picked){ ab.disabled=true; ab.style.opacity=".4"; }
+    wrap.appendChild(ab);
+    box.appendChild(wrap);
+
+    if(stored){
+      var n2=document.createElement("span");
+      n2.className="lbl";
+      n2.style.width="100%";
+      n2.textContent="editing fingering of a stored chord \u2014 saved as you change it";
+      box.appendChild(n2);
+    }
+  }
+
+  function renderShapeLib(){
+    var shapeLibBox=document.getElementById("shapeLib");
+    if(!shapeLibBox) return;
+    shapeLibBox.innerHTML="";
+    if(state.mode!=="triad"){ return; }
+    if(!SHAPES.length){
+      shapeLibBox.innerHTML='<span class="lbl">nothing saved yet \u2014 use Keep shape</span>';
+      return;
+    }
+    SHAPES.forEach(function(sh,i){
+      shapeLibBox.appendChild(chip(sh.name+" \u00b7 fr "+sh.min,state.libIdx===i,function(){
+        state.libIdx=i;state.viewIdx=-1;
+        state.edit={strings:sh.strings.slice(),frets:sh.frets.slice(),bass:"1",min:sh.min,
+                    fingers:(sh.fingers||[]).slice()};
+        state.sel=-1;state.fingerIdx=0;state.savedIdx=-1;
+        renderAB();renderChips();draw();
+      },"sans-chip"));
+    });
+    if(state.libIdx>=0){
+      shapeLibBox.appendChild(chip("Delete",false,function(){
+        SHAPES.splice(state.libIdx,1);persistShapes();
+        state.libIdx=-1;renderChips();draw();
+      },"sans-chip"));
+    }
+  }
+
+  function renderProgLib(){
+    var progLibBox=document.getElementById("progLib");
+    if(!progLibBox) return;
+    progLibBox.innerHTML="";
+    if(state.mode!=="triad") return;
+
+    /* Naming happens inline — iOS blocks prompt() in home-screen apps. */
+    if(state.naming){
+      var inp=document.createElement("input");
+      inp.type="text";
+      inp.value=state.namingValue||("Progression "+(Object.keys(PROGLIB).length+1));
+      inp.setAttribute("aria-label","Progression name");
+      inp.style.cssText="font-family:'IBM Plex Sans',sans-serif;font-size:15px;padding:9px 11px;"+
+        "border:1.5px solid #B5AB99;border-radius:3px;background:#FFFBF2;color:#14100C;min-width:190px";
+      inp.addEventListener("input",function(){ state.namingValue=inp.value; });
+      inp.addEventListener("keydown",function(e){ if(e.key==="Enter") doSave(); });
+      progLibBox.appendChild(inp);
+
+      function doSave(){
+        var nm=(state.namingValue||inp.value||"").trim();
+        if(!nm){ return; }
+        PROGLIB[nm]=PROG.map(function(x){
+          return {name:x.name,strings:x.strings.slice(),frets:x.frets.slice(),min:x.min};
+        });
+        persistProgLib();
+        state.naming=false;state.namingValue="";
+        renderProgLib();
+      }
+      progLibBox.appendChild(chip("Save",false,doSave));
+      progLibBox.appendChild(chip("Cancel",false,function(){
+        state.naming=false;state.namingValue="";renderProgLib();
+      },"sans-chip"));
+      setTimeout(function(){ try{ inp.focus(); inp.select(); }catch(e){} },0);
+      return;
+    }
+
+    if(PROG.length){
+      progLibBox.appendChild(chip("Save this progression",false,function(){
+        state.naming=true;
+        state.namingValue="Progression "+(Object.keys(PROGLIB).length+1);
+        renderProgLib();
+      },"sans-chip"));
+    }
+
+    var names=Object.keys(PROGLIB);
+    if(!names.length){
+      if(!PROG.length){
+        progLibBox.innerHTML='<span class="lbl">none saved yet</span>';
+      }
+      return;
+    }
+
+    names.forEach(function(nm){
+      progLibBox.appendChild(chip(nm+" ("+PROGLIB[nm].length+")",state.progSel===nm,function(){
+        PROG=PROGLIB[nm].map(function(x){
+          return {name:x.name,strings:x.strings.slice(),frets:x.frets.slice(),min:x.min};
+        });
+        persistProg();
+        state.progSel=nm;state.viewIdx=0;state.sel=-1;
+        renderAB();renderChips();draw();
+      },"sans-chip"));
+    });
+
+    if(state.progSel && PROGLIB[state.progSel]){
+      progLibBox.appendChild(chip("Delete \u201c"+state.progSel+"\u201d",false,function(){
+        delete PROGLIB[state.progSel];persistProgLib();
+        state.progSel=null;renderProgLib();
+      },"sans-chip"));
+    }
+  }
+
   function renderRanges(){
+    var rangeBox=document.getElementById("ranges");
+    if(!rangeBox) return;
     rangeBox.innerHTML="";
     RANGES.forEach(function(r,i){
       rangeBox.appendChild(chip(r.n,i===rangeIdx,function(){
-        rangeIdx=i;state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;renderRanges();renderChips();draw();
+        rangeIdx=i;state.voiceIdx=0;state.fingerIdx=0;state.edit=null;state.sel=-1;state.savedIdx=-1;renderRanges();renderChips();draw();
       },"sans-chip"));
     });
   }
@@ -1193,7 +1822,7 @@
     });
   }
 
-  renderRanges();renderChips();syncMode();syncDisp();draw();renderMeter();renderGrooves();renderSub();renderBeats();setBpm(90);
+  loadSaved();loadProg();loadShapes();loadProgLib();renderRanges();renderChips();syncMode();syncDisp();renderAB();draw();renderMeter();renderGrooves();renderSub();renderBeats();setBpm(90);
 })();
 </script>
 <script>
@@ -1202,6 +1831,30 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(function(){});
   });
 }
+</script>
+
+<script>
+(function(){
+  var b=document.getElementById("clearcache");
+  if(!b) return;
+  b.addEventListener("click",function(){
+    b.textContent="Refreshing\u2026";
+    var jobs=[];
+    if(window.caches && caches.keys){
+      jobs.push(caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+      }).catch(function(){}));
+    }
+    if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){ return r.unregister(); }));
+      }).catch(function(){}));
+    }
+    Promise.all(jobs).then(function(){
+      location.reload();
+    });
+  });
+})();
 </script>
 </body>
 </html>
