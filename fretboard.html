@@ -417,9 +417,6 @@
     if(pcs.length===2){
       var a=pcs[0],b=pcs[1];
       var iv=Math.min(((b-a)%12+12)%12,((a-b)%12+12)%12);
-      for(var r2=0;r2<FORMULAS.length;r2++){
-        if(FORMULAS[r2].iv.length!==2) continue;
-      }
       if(iv===7) return {name:pcName(bassPc)+"5",exact:true,rootPc:bassPc};
       return {name:pcName(bassPc)+" + "+IVNAME[iv],exact:false,loose:true,rootPc:bassPc};
     }
@@ -468,8 +465,8 @@
     try{ window.localStorage.setItem(PROG_KEY,JSON.stringify(PROG)); }catch(e){}
   }
   function addToProg(){
-    if(!state.edit) return;
-    PROG.push({name:(liveName||"chord"),
+    if(!validShape(state.edit)) return;
+    PROG.push({name:shapeName(state.edit),
                strings:state.edit.strings.slice(),
                frets:state.edit.frets.slice(),
                fingers:(state.edit.fingers||[]).slice(),
@@ -533,6 +530,16 @@
   }
 
   var liveName="";
+
+  /* Name a shape from the notes it actually contains, at the moment it is
+     saved. Reading a global set during rendering gave stale names. */
+  function shapeName(v){
+    if(!v||!v.strings||!v.strings.length) return "shape";
+    var ms=[];
+    for(var i=0;i<v.strings.length;i++) ms.push(STRINGS[v.strings[i]].midi+v.frets[i]);
+    var id=identify(ms);
+    return (id&&id.name)?id.name:"shape";
+  }
   var SAVED={};
   var SAVE_KEY="fretboard.shapes.v1";
   function loadSaved(){
@@ -542,12 +549,16 @@
   function persistSaved(){
     try{ window.localStorage.setItem(SAVE_KEY,JSON.stringify(SAVED)); }catch(e){}
   }
+  function validShape(v){
+    return !!(v && v.strings && v.frets && v.strings.length===v.frets.length && v.strings.length);
+  }
+
   function shapeKey(){
     return state.rootIdx+"|"+state.shape[0]+"|"+state.shape[1];
   }
   function savedHere(){ return SAVED[shapeKey()]||[]; }
   function saveCurrent(){
-    if(!state.edit) return;
+    if(!validShape(state.edit)) return;
     var list=savedHere().slice();
     var rec={strings:state.edit.strings.slice(),frets:state.edit.frets.slice(),
              bass:state.edit.bass,min:Math.min.apply(null,state.edit.frets),
@@ -774,8 +785,10 @@
     var vlist=null,vv=null;
     if(state.mode==="triad"){
       vlist=state.voiceList&&state.voiceList.length?state.voiceList:voicings();
+      if(!vlist.length){ vlist=voicings(); state.voiceList=vlist; }
       if(!state.edit){
-        var base=vlist[Math.min(state.voiceIdx,vlist.length-1)];
+        var bi=(state.voiceIdx>=0 && state.voiceIdx<vlist.length)?state.voiceIdx:0;
+        var base=vlist[bi]||vlist[0];
         if(base) state.edit={strings:base.strings.slice(),frets:base.frets.slice(),
                              inv:base.inv,min:base.min,bass:base.bass};
       }
@@ -995,7 +1008,7 @@
     var rb=document.getElementById("roots");rb.innerHTML="";
     ROOTS.forEach(function(r,i){
       rb.appendChild(chip(state.sharps?r.sharp:r.flat,i===state.rootIdx,function(){
-        state.rootIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;state.savedIdx=-1;state.viewIdx=-1;renderAB();renderChips();draw();
+        state.rootIdx=i;state.fingerIdx=0;state.edit=null;state.sel=-1;state.savedIdx=-1;state.viewIdx=-1;state.voiceIdx=0;state.libIdx=-1;renderAB();renderChips();draw();
       }));
     });
 
@@ -1054,7 +1067,7 @@
         var lab2="\u2605 "+sn2+" \u00b7 fr "+rec.min;
         var picked=(state.savedIdx===i);
         vb.appendChild(chip(lab2,picked,function(){
-          state.savedIdx=i;state.voiceIdx=-1;
+          state.savedIdx=i;
           state.edit={strings:rec.strings.slice(),frets:rec.frets.slice(),
                       bass:rec.bass,min:rec.min,fingers:(rec.fingers||[]).slice()};
           state.fingerIdx=rec.fingerIdx||0;state.sel=-1;
@@ -1072,8 +1085,8 @@
             var ac=anchorCost(v);
             label+="  ·  shift "+ac.shift+(ac.common?", "+ac.common+" stay":"");
           }
-          vb.appendChild(chip(label,state.voiceIdx===i&&state.savedIdx<0,function(){
-            state.voiceIdx=i;state.savedIdx=-1;state.fingerIdx=0;state.edit=null;state.sel=-1;
+          vb.appendChild(chip(label,state.voiceIdx===i&&state.savedIdx<0&&state.libIdx<0,function(){
+            state.voiceIdx=i;state.savedIdx=-1;state.libIdx=-1;state.fingerIdx=0;state.edit=null;state.sel=-1;
             state.viewIdx=-1;renderAB();renderChips();draw();
           },"sans-chip"));
         });
@@ -1112,7 +1125,7 @@
           },"sans-chip"));
         }
         fb2.appendChild(chip("Keep shape",false,function(){
-          SHAPES.push({name:(liveName||"shape"),
+          SHAPES.push({name:shapeName(state.edit),
                        strings:state.edit.strings.slice(),
                        frets:state.edit.frets.slice(),
                        fingers:(state.edit.fingers||[]).slice(),
@@ -1134,7 +1147,7 @@
           },"sans-chip"));
         }
         fb2.appendChild(chip("Reset shape",false,function(){
-          state.edit=null;state.sel=-1;state.fingerIdx=0;state.savedIdx=-1;renderChips();draw();
+          state.edit=null;state.sel=-1;state.fingerIdx=0;state.savedIdx=-1;state.voiceIdx=0;state.libIdx=-1;renderChips();draw();
         },"sans-chip"));
         if(isBarre(cur)){
           var note=document.createElement("span");
