@@ -203,6 +203,7 @@ body.perform #bar .hideperf{display:none}
       <input id="lyrfile" type="file" accept=".txt,.json,.md,text/plain,application/json" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       <button class="ctl" id="lyrsaveall">Save file</button>
       <button class="ctl" id="lyrclear">Clear</button>
+      <button class="ctl" id="clearcache">Refresh app</button>
       <button class="ctl" id="lyrcancel">Close</button>
       <button class="ctl" id="lyrsave" aria-pressed="true">Save</button>
     </div>
@@ -637,9 +638,43 @@ loadStore(); buildList(""); sync(); syncLyr(); render();
 })();
 </script>
 <script>
+(function(){
+  var b=document.getElementById("clearcache");
+  if(!b) return;
+  b.addEventListener("click",function(){
+    b.textContent="Refreshing\u2026";
+    var jobs=[];
+    if(window.caches && caches.keys){
+      jobs.push(caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+      }).catch(function(){}));
+    }
+    if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){ return r.unregister(); }));
+      }).catch(function(){}));
+    }
+    Promise.all(jobs).then(function(){
+      location.reload();
+    });
+  });
+})();
+</script>
+<script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+    /* only reload when an EXISTING worker is replaced; reloading on first
+       install can interrupt the initial render and leave a blank board */
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
+      reg.update();
+      var reloaded=false;
+      navigator.serviceWorker.addEventListener('controllerchange',function(){
+        if(!hadController || reloaded) return;
+        reloaded=true;
+        location.reload();
+      });
+    }).catch(function(){});
   });
 }
 </script>

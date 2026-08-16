@@ -73,7 +73,18 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+    /* only reload when an EXISTING worker is replaced; reloading on first
+       install can interrupt the initial render and leave a blank board */
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
+      reg.update();
+      var reloaded=false;
+      navigator.serviceWorker.addEventListener('controllerchange',function(){
+        if(!hadController || reloaded) return;
+        reloaded=true;
+        location.reload();
+      });
+    }).catch(function(){});
   });
 }
 </script>

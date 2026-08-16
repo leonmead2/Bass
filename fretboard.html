@@ -407,7 +407,7 @@
   }
 
   /* Given the sounding pitches, work out what the chord is now called. */
-  function identify(midis){
+  function identify(midis,preferPc){
     if(!midis.length) return null;
     var pcs=[],seen={};
     midis.forEach(function(m){ var p=((m%12)+12)%12; if(!seen[p]){seen[p]=1;pcs.push(p);} });
@@ -432,6 +432,9 @@
         if(!exact && !subset) continue;
         var missing=f.iv.filter(function(v){return ivs.indexOf(v)<0;});
         var score=(exact?0:100)+missing.length*10+f.iv.length+(r===bassPc?0:1);
+        /* Am7 and C6 are the same four notes. When the player has chosen a
+           root, read the stack from that root rather than from the bass. */
+        if(preferPc!==undefined && preferPc!==null && r===preferPc) score-=8;
         if(!best || score<best.score){
           best={score:score,root:r,f:f,missing:missing,exact:exact};
         }
@@ -533,11 +536,26 @@
 
   /* Name a shape from the notes it actually contains, at the moment it is
      saved. Reading a global set during rendering gave stale names. */
+  /* Sounding notes, low to high. Labels used to show string names here,
+     which reads like a chord spelling and is not. */
+  function notesOf(v){
+    if(!v||!v.strings) return "";
+    var ms=[];
+    for(var i=0;i<v.strings.length;i++) ms.push(STRINGS[v.strings[i]].midi+v.frets[i]);
+    ms.sort(function(a,b){return a-b;});
+    var out=[],seen={};
+    ms.forEach(function(m){
+      var n=pcName(m%12);
+      if(!seen[n]){seen[n]=1;out.push(n);}
+    });
+    return out.join("\u2009");
+  }
+
   function shapeName(v){
     if(!v||!v.strings||!v.strings.length) return "shape";
     var ms=[];
     for(var i=0;i<v.strings.length;i++) ms.push(STRINGS[v.strings[i]].midi+v.frets[i]);
-    var id=identify(ms);
+    var id=identify(ms,(state.mode==="triad")?ROOTS[state.rootIdx].pc:null);
     return (id&&id.name)?id.name:"shape";
   }
   var SAVED={};
@@ -796,6 +814,9 @@
       if(state.viewIdx>=0 && PROG[state.viewIdx]){
         vv=activeShape();
       }
+      /* Last resort: if no shape could be determined, fall back to showing
+         the chord tones across the neck rather than leaving it blank. */
+      if(!validShape(vv)){ vv=null; state.edit=null; }
     }
 
     /* Every place the selected tone can live — including strings another
@@ -874,7 +895,7 @@
     if(state.mode==="triad" && vv){
       var soundNow=[];
       for(var q0=0;q0<vv.strings.length;q0++) soundNow.push(STRINGS[vv.strings[q0]].midi+vv.frets[q0]);
-      liveId=identify(soundNow);
+      liveId=identify(soundNow,(state.mode==="triad")?ROOTS[state.rootIdx].pc:null);
       var stringUse={};
       vv.strings.forEach(function(si){ stringUse[si]=(stringUse[si]||0)+1; });
       for(var j=0;j<vv.strings.length;j++){
@@ -909,7 +930,7 @@
     state.outOfView=outOfView;
 
     STRINGS.forEach(function(s,i){
-      if(state.mode==="triad") return;
+      if(state.mode==="triad" && vv) return;   /* shape drawn above */
       var y=TOP_Y+i*STR_GAP;
 
       for(var f=(LO()===0?0:LO()+1);f<=HI();f++){
@@ -939,7 +960,7 @@
       for(var mi=0;mi<vv.strings.length;mi++){
         sounding.push(STRINGS[vv.strings[mi]].midi+vv.frets[mi]);
       }
-      var id=identify(sounding);
+      var id=identify(sounding,(state.mode==="triad")?ROOTS[state.rootIdx].pc:null);
       var pcsOrdered=sounding.slice().sort(function(a,b){return a-b;})
         .map(function(m){return pcName(m%12);});
       var uniq=[],sn={};
@@ -957,7 +978,7 @@
     if(state.mode==="triad" && vv){
       var parts=[];
       for(var q=0;q<vv.strings.length;q++){
-        parts.push(STRINGS[vv.strings[q]].name+" str · fr "+vv.frets[q]+
+        parts.push(STRINGS[vv.strings[q]].name+" string · fr "+vv.frets[q]+
                    (fingerFor(vv,q)?" · finger "+fingerFor(vv,q):""));
       }
       var pressedNow=vv.frets.filter(function(f){return f>0;});
@@ -1063,8 +1084,7 @@
       }
       var mine=savedHere();
       mine.forEach(function(rec,i){
-        var sn2=rec.strings.map(function(si){return STRINGS[si].name;}).reverse().join("-");
-        var lab2="\u2605 "+sn2+" \u00b7 fr "+rec.min;
+        var lab2="\u2605 "+shapeName(rec)+" \u00b7 fr "+rec.min;
         var picked=(state.savedIdx===i);
         vb.appendChild(chip(lab2,picked,function(){
           state.savedIdx=i;
@@ -1079,11 +1099,12 @@
       }else{
         if(state.voiceIdx>=vs.length) state.voiceIdx=0;
         vs.forEach(function(v,i){
-          var sn=v.strings.map(function(si){return STRINGS[si].name;}).reverse().join("-");
-          var label=sn+" · fr "+v.min+" · "+(v.bass==="1"?"root":v.bass+" bass")+" · "+(v.span||0)+"fr";
+          var label=shapeName(v)+"  ·  fr "+v.min;
           if(anchorRef()){
             var ac=anchorCost(v);
-            label+="  ·  shift "+ac.shift+(ac.common?", "+ac.common+" stay":"");
+            /* ranking still uses the full cost; the label only notes
+               fingers that stay put, which the fret number cannot show */
+            if(ac.common) label+="  ·  "+ac.common+" hold";
           }
           vb.appendChild(chip(label,state.voiceIdx===i&&state.savedIdx<0&&state.libIdx<0,function(){
             state.voiceIdx=i;state.savedIdx=-1;state.libIdx=-1;state.fingerIdx=0;state.edit=null;state.sel=-1;
@@ -1713,7 +1734,7 @@
       return;
     }
     SHAPES.forEach(function(sh,i){
-      shapeLibBox.appendChild(chip(sh.name+" \u00b7 fr "+sh.min,state.libIdx===i,function(){
+      shapeLibBox.appendChild(chip(sh.name+"  \u00b7  fr "+sh.min,state.libIdx===i,function(){
         state.libIdx=i;state.viewIdx=-1;
         state.edit={strings:sh.strings.slice(),frets:sh.frets.slice(),bass:"1",min:sh.min,
                     fingers:(sh.fingers||[]).slice()};
@@ -1839,14 +1860,6 @@
 })();
 </script>
 <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
-  });
-}
-</script>
-
-<script>
 (function(){
   var b=document.getElementById("clearcache");
   if(!b) return;
@@ -1868,6 +1881,24 @@ if('serviceWorker' in navigator){
     });
   });
 })();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    /* only reload when an EXISTING worker is replaced; reloading on first
+       install can interrupt the initial render and leave a blank board */
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
+      reg.update();
+      var reloaded=false;
+      navigator.serviceWorker.addEventListener('controllerchange',function(){
+        if(!hadController || reloaded) return;
+        reloaded=true;
+        location.reload();
+      });
+    }).catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
