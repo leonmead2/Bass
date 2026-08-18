@@ -241,7 +241,7 @@ body.perform #bar .hideperf{display:none}
         <code>Segno</code> <code>Coda</code> <code>D.S.</code> <code>D.C.</code>
       </div>
     </details>
-    <p>Charts you add are kept on this device.</p>
+    <p>Saving also downloads the chart as a file. Keep it — device storage is erased if you ever clear website data. <b>Load charts file</b> brings it back.</p>
     <textarea id="pastetext" spellcheck="false" placeholder="{title: New Song}&#10;{key: G}&#10;{tempo: 120}&#10;{time: 4/4}&#10;&#10;{comment: Verse}&#10;| G | C | D | G |"></textarea>
     <div class="pasterow">
       <button class="ctl" id="chartload">Load charts file</button>
@@ -674,6 +674,17 @@ document.getElementById("addbtn").addEventListener("click",function(){
 document.getElementById("pastecancel").addEventListener("click",function(){ pasteEl.classList.remove("on"); });
 /* Charts you add can be exported to a file and reloaded anywhere —
    browser storage is tied to one address, a file is not. */
+function downloadChart(nm,txt){
+  try{
+    var blob=new Blob([txt],{type:"text/plain"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=nm.replace(/[\/\\:]/g,"-")+".txt";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  }catch(e){}
+}
+
 document.getElementById("chartsave").addEventListener("click",function(){
   var payload=JSON.stringify({charts:MYCHARTS,lyrics:LYRICS},null,1);
   var blob=new Blob([payload],{type:"application/json"});
@@ -736,6 +747,9 @@ document.getElementById("pastesave").addEventListener("click",function(){
   CHARTS[nm]=txt;
   MYCHARTS[nm]=txt;
   saveMyCharts();
+  /* Browser storage is tied to one address and is wiped by clearing site
+     data. Write the chart to a real file straight away so it survives. */
+  downloadChart(nm,txt);
   document.getElementById("pastetext").value="";
   pasteEl.classList.remove("on");
   buildList(document.getElementById("search").value);
