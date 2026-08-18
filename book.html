@@ -113,6 +113,13 @@ input[type=range].spd{width:110px;accent-color:#F5B93F}
 .lyrblock{font-family:"IBM Plex Sans",sans-serif;font-size:.82em;line-height:1.5;
   color:var(--ink);opacity:.86;white-space:pre-wrap;margin:2px 0 12px;padding-left:10px;
   border-left:2px solid var(--rule)}
+#fmthelp{border:1px solid #C3B9A4;border-radius:3px;padding:8px 11px;background:#FFFBF2}
+#fmthelp summary{cursor:pointer;font-size:14px;font-weight:600;color:#15110D}
+#fmthelp .fmt{font-size:13px;line-height:1.75;color:#3A342A;margin-top:8px}
+#fmthelp .fmt b{display:block;margin-top:9px;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:#9A6B12}
+#fmthelp code{background:#EDE6D8;border-radius:2px;padding:1px 5px;
+  font-family:"IBM Plex Mono",monospace;font-size:12.5px}
 #lyrdlg{position:fixed;inset:0;background:rgba(10,8,6,.72);display:none;
   align-items:center;justify-content:center;padding:20px;z-index:22}
 #lyrdlg.on{display:flex}
@@ -213,11 +220,27 @@ body.perform #bar .hideperf{display:none}
 <div id="paste" role="dialog" aria-modal="true" aria-label="Add a chart">
   <div id="pastebox">
     <h2>Add a chart</h2>
-    <p>Paste ChordPro. Header lines in braces, bars separated by pipes — for example
-       <code>{title: Song}</code>, <code>{key: G}</code>, <code>{comment: Verse}</code>,
-       then <code>| G | C | D | G |</code>. Charts you add are kept on this device.</p>
+    <details id="fmthelp">
+      <summary>How to write a chart</summary>
+      <div class="fmt">
+        <b>Header</b> — only the title is required<br>
+        <code>{title: Song Name}</code> <code>{key: G}</code> <code>{tempo: 120}</code> <code>{time: 4/4}</code>
+        <b>Sections</b><br>
+        <code>{comment: Verse}</code> — name it whatever you like
+        <b>Bars</b> — any line starting with a pipe<br>
+        <code>| G | C | D | G |</code>
+        <b>Inside a bar</b><br>
+        <code>G C</code> two chords &nbsp;·&nbsp; <code>G . . C</code> dots hold beats &nbsp;·&nbsp;
+        <code>%</code> repeat previous bar &nbsp;·&nbsp; <code>(guitar intro)</code> a note instead of chords
+        <b>Repeats</b><br>
+        <code>| : G | C : |</code> repeat &nbsp;·&nbsp; <code>| 1. G | 2. C |</code> endings &nbsp;·&nbsp;
+        <code>Segno</code> <code>Coda</code> <code>D.S.</code> <code>D.C.</code>
+      </div>
+    </details>
+    <p>Charts you add are kept on this device.</p>
     <textarea id="pastetext" spellcheck="false" placeholder="{title: New Song}&#10;{key: G}&#10;{tempo: 120}&#10;{time: 4/4}&#10;&#10;{comment: Verse}&#10;| G | C | D | G |"></textarea>
     <div class="pasterow">
+      <button class="ctl" id="pastedelete">Delete this chart</button>
       <button class="ctl" id="pastecancel">Cancel</button>
       <button class="ctl" id="pastesave" aria-pressed="true">Add chart</button>
     </div>
@@ -626,8 +649,32 @@ document.getElementById("lyrToggle").addEventListener("click",function(){
 
 /* paste-in charts */
 var pasteEl=document.getElementById("paste");
-document.getElementById("addbtn").addEventListener("click",function(){ pasteEl.classList.add("on"); document.getElementById("pastetext").focus(); });
+document.getElementById("addbtn").addEventListener("click",function(){
+  var del=document.getElementById("pastedelete");
+  var mine=!!(state.name && MYCHARTS[state.name]);
+  del.style.display=mine?"":"none";
+  del.textContent=mine?("Delete “"+state.name+"”"):"Delete this chart";
+  var ta=document.getElementById("pastetext");
+  if(!ta.value.trim()){
+    ta.value="{title: New Song}\n{key: G}\n{tempo: 120}\n{time: 4/4}\n\n"+
+             "{comment: Intro}\n| G | C | D | G |\n\n"+
+             "{comment: Verse}\n| : G | C | G | D : |\n\n"+
+             "{comment: Chorus}\n| C | G | D . . C | G |\n";
+  }
+  pasteEl.classList.add("on");
+  ta.focus();
+});
 document.getElementById("pastecancel").addEventListener("click",function(){ pasteEl.classList.remove("on"); });
+document.getElementById("pastedelete").addEventListener("click",function(){
+  if(!state.name || !MYCHARTS[state.name]) return;
+  delete MYCHARTS[state.name];
+  delete CHARTS[state.name];
+  saveMyCharts();
+  state.name=null; state.chart=null;
+  pasteEl.classList.remove("on");
+  buildList(document.getElementById("search").value);
+  render();
+});
 document.getElementById("pastesave").addEventListener("click",function(){
   var txt=document.getElementById("pastetext").value.trim();
   if(!txt){ pasteEl.classList.remove("on"); return; }
