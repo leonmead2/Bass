@@ -215,7 +215,7 @@ body.perform #bar .hideperf{display:none}
     <h2>Add a chart</h2>
     <p>Paste ChordPro. Header lines in braces, bars separated by pipes — for example
        <code>{title: Song}</code>, <code>{key: G}</code>, <code>{comment: Verse}</code>,
-       then <code>| G | C | D | G |</code>. Charts added here last for this session only.</p>
+       then <code>| G | C | D | G |</code>. Charts you add are kept on this device.</p>
     <textarea id="pastetext" spellcheck="false" placeholder="{title: New Song}&#10;{key: G}&#10;{tempo: 120}&#10;{time: 4/4}&#10;&#10;{comment: Verse}&#10;| G | C | D | G |"></textarea>
     <div class="pasterow">
       <button class="ctl" id="pastecancel">Cancel</button>
@@ -428,6 +428,21 @@ var LYRICS={};   /* song name -> raw text, this device only */
 /* Persist on the device. Wrapped because some sandboxes block storage;
    if it is unavailable the app still runs, just without remembering. */
 var STORE_KEY="book.lyrics.v1";
+var CHART_KEY="book.charts.v1";
+var MYCHARTS={};   /* charts you added, kept on this device */
+function loadMyCharts(){
+  try{
+    var raw=window.localStorage.getItem(CHART_KEY);
+    if(raw){
+      MYCHARTS=JSON.parse(raw)||{};
+      Object.keys(MYCHARTS).forEach(function(k){ CHARTS[k]=MYCHARTS[k]; });
+    }
+  }catch(e){ /* storage unavailable */ }
+}
+function saveMyCharts(){
+  try{ window.localStorage.setItem(CHART_KEY,JSON.stringify(MYCHARTS)); }
+  catch(e){ /* storage unavailable */ }
+}
 function loadStore(){
   try{
     var raw=window.localStorage.getItem(STORE_KEY);
@@ -619,6 +634,8 @@ document.getElementById("pastesave").addEventListener("click",function(){
   var c=parseChart(txt);
   var nm=c.title||("Untitled "+(Object.keys(CHARTS).length+1));
   CHARTS[nm]=txt;
+  MYCHARTS[nm]=txt;
+  saveMyCharts();
   document.getElementById("pastetext").value="";
   pasteEl.classList.remove("on");
   buildList(document.getElementById("search").value);
@@ -634,7 +651,7 @@ document.addEventListener("keydown",function(e){
   else if(e.key==="ArrowUp"||e.key==="PageUp"){ e.preventDefault(); sheet.scrollTop-=sheet.clientHeight*0.85; }
 });
 
-loadStore(); buildList(""); sync(); syncLyr(); render();
+loadStore(); loadMyCharts(); buildList(""); sync(); syncLyr(); render();
 })();
 </script>
 <script>
