@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bass Tools</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -71,22 +75,37 @@
   </div>
 </div>
 <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    /* only reload when an EXISTING worker is replaced; reloading on first
-       install can interrupt the initial render and leave a blank board */
-    var hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
-      reg.update();
-      var reloaded=false;
-      navigator.serviceWorker.addEventListener('controllerchange',function(){
-        if(!hadController || reloaded) return;
-        reloaded=true;
-        location.reload();
-      });
+(function(){
+  /* One button. Removes any service worker, deletes every cache, then
+     reloads past the browser cache with a fresh URL. */
+  function hardRefresh(btn){
+    if(btn){ btn.textContent="Updating\u2026"; btn.disabled=true; }
+    var jobs=[];
+    if(window.caches && caches.keys){
+      jobs.push(caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+      }).catch(function(){}));
+    }
+    if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){ return r.unregister(); }));
+      }).catch(function(){}));
+    }
+    Promise.all(jobs).then(function(){
+      var base=location.href.split("#")[0].split("?")[0];
+      location.replace(base+"?v="+Date.now());
+    });
+  }
+  var b=document.getElementById("clearcache");
+  if(b) b.addEventListener("click",function(){ hardRefresh(b); });
+
+  /* Remove any worker left over from earlier versions, once, silently. */
+  if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+    navigator.serviceWorker.getRegistrations().then(function(rs){
+      if(rs.length){ rs.forEach(function(r){ r.unregister(); }); }
     }).catch(function(){});
-  });
-}
+  }
+})();
 </script>
 </body>
 </html>

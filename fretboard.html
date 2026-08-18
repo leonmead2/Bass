@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fretboard — 6-String Bass in BEADGC</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -816,7 +820,10 @@
       }
       /* Last resort: if no shape could be determined, fall back to showing
          the chord tones across the neck rather than leaving it blank. */
-      if(!validShape(vv)){ vv=null; state.edit=null; }
+      if(!validShape(vv)){
+        vv=null; state.edit=null;
+        state.shapeFail=true;          /* say so in the readout rather than paint everything */
+      } else { state.shapeFail=false; }
     }
 
     /* Every place the selected tone can live — including strings another
@@ -930,7 +937,7 @@
     state.outOfView=outOfView;
 
     STRINGS.forEach(function(s,i){
-      if(state.mode==="triad" && vv) return;   /* shape drawn above */
+      if(state.mode==="triad") return;   /* shapes are drawn above, never the whole neck */
       var y=TOP_Y+i*STR_GAP;
 
       for(var f=(LO()===0?0:LO()+1);f<=HI();f++){
@@ -955,6 +962,12 @@
     document.getElementById("fb").innerHTML=g;
     if(state.mode==="triad") renderFingerNow();
 
+    if(state.mode==="triad" && !vv){
+      document.getElementById("spelling").innerHTML=
+        '<span class="r">No fingering available</span><br>'+
+        '<span style="font-size:.9em">pick one from the Fingering row above</span>';
+      document.getElementById("formula").textContent="";
+    }
     if(state.mode==="triad" && vv){
       var sounding=[];
       for(var mi=0;mi<vv.strings.length;mi++){
@@ -1861,10 +1874,10 @@
 </script>
 <script>
 (function(){
-  var b=document.getElementById("clearcache");
-  if(!b) return;
-  b.addEventListener("click",function(){
-    b.textContent="Refreshing\u2026";
+  /* One button. Removes any service worker, deletes every cache, then
+     reloads past the browser cache with a fresh URL. */
+  function hardRefresh(btn){
+    if(btn){ btn.textContent="Updating\u2026"; btn.disabled=true; }
     var jobs=[];
     if(window.caches && caches.keys){
       jobs.push(caches.keys().then(function(ks){
@@ -1877,28 +1890,20 @@
       }).catch(function(){}));
     }
     Promise.all(jobs).then(function(){
-      location.reload();
+      var base=location.href.split("#")[0].split("?")[0];
+      location.replace(base+"?v="+Date.now());
     });
-  });
-})();
-</script>
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    /* only reload when an EXISTING worker is replaced; reloading on first
-       install can interrupt the initial render and leave a blank board */
-    var hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
-      reg.update();
-      var reloaded=false;
-      navigator.serviceWorker.addEventListener('controllerchange',function(){
-        if(!hadController || reloaded) return;
-        reloaded=true;
-        location.reload();
-      });
+  }
+  var b=document.getElementById("clearcache");
+  if(b) b.addEventListener("click",function(){ hardRefresh(b); });
+
+  /* Remove any worker left over from earlier versions, once, silently. */
+  if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+    navigator.serviceWorker.getRegistrations().then(function(rs){
+      if(rs.length){ rs.forEach(function(r){ r.unregister(); }); }
     }).catch(function(){});
-  });
-}
+  }
+})();
 </script>
 </body>
 </html>
