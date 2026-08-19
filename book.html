@@ -72,6 +72,7 @@ body{
   padding:calc(9px + env(safe-area-inset-top)) 12px 9px;
   background:var(--chrome2);border-bottom:1px solid rgba(255,255,255,.14);
 }
+a.ctl.backlink{display:inline-block;text-decoration:none;line-height:1}
 button.ctl{
   font-family:"IBM Plex Mono",monospace;font-size:15px;
   background:#E8E2D5;color:#14100C;border:1.5px solid #B5AB99;border-radius:3px;
@@ -169,6 +170,7 @@ body.perform #bar .hideperf{display:none}
 
   <main id="main">
     <div id="bar">
+      <a class="ctl backlink" href="index.html" aria-label="Back to the app list">←</a>
       <button class="ctl" id="libtoggle" aria-label="Show song list">☰</button>
       <div class="grp"><span class="tag hideperf">Key</span>
         <button class="ctl" id="down" aria-label="Transpose down">−</button>

@@ -45,6 +45,11 @@
   }
   h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:40px;line-height:1;margin:0}
   h1 em{font-style:italic;color:var(--brass)}
+  h1 .backlink{text-decoration:none;color:var(--ash);font-size:.62em;
+    vertical-align:.18em;margin-right:6px;padding:2px 8px;border:1px solid var(--rule);
+    border-radius:3px;font-family:"IBM Plex Sans",sans-serif}
+  h1 .backlink:hover{color:var(--bone);border-color:var(--bone)}
+  h1 .backlink:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
   .tuning{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ash)}
 
   .lbl{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ash)}
@@ -116,7 +121,7 @@
 <div class="wrap">
 
   <header>
-    <h1>Fretboard <em>reference</em></h1>
+    <h1><a class="backlink" href="index.html" aria-label="Back to the app list">←</a> Fretboard <em>reference</em></h1>
     <div class="tuning">6-string bass · B E A D G C · frets 0–12</div>
   </header>
 
