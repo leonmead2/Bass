@@ -481,7 +481,12 @@ function render(){
 /* ---------- state + wiring ---------- */
 var state={chart:null,name:null,editing:null,shift:0,numbers:false,size:19,scrolling:false,speed:22,lyrics:false};
 var LYRICS={}, MYCHARTS={};
-var STORE_KEY="book.lyrics.v1", CHART_KEY="book.charts.v1";
+var STORE_KEY="book.lyrics.v1", CHART_KEY="book.charts.v1", SET_KEY="book.sets.v1";
+var SETS={};          /* name -> ordered list of chart names */
+var building=[];      /* the list currently being assembled */
+var activeSet=null;   /* set driving the sidebar, or null for the full library */
+function loadSets(){ try{var r=localStorage.getItem(SET_KEY); if(r) SETS=JSON.parse(r)||{};}catch(e){} }
+function saveSets(){ try{localStorage.setItem(SET_KEY,JSON.stringify(SETS));}catch(e){} }
 function loadStore(){ try{var r=localStorage.getItem(STORE_KEY); if(r) LYRICS=JSON.parse(r)||{};}catch(e){} }
 function saveStore(){ try{localStorage.setItem(STORE_KEY,JSON.stringify(LYRICS));}catch(e){} }
 function loadMyCharts(){ try{var r=localStorage.getItem(CHART_KEY); if(r){MYCHARTS=JSON.parse(r)||{};
