@@ -166,7 +166,7 @@ body.perform #bar .hideperf{display:none}
     <div class="count" id="count"></div>
     <input id="search" type="search" placeholder="Find a song" aria-label="Find a song">
     <div id="songs"></div>
-    <div id="libfoot"><button class="ctl" id="addbtn" style="width:100%;margin-bottom:8px">Add a chart</button><button class="ctl" id="lyrbtn" style="width:100%">Lyrics library</button></div>
+    <div id="libfoot"><button class="ctl" id="addbtn" style="width:100%;margin-bottom:8px">Add a chart</button><button class="ctl" id="editbtn" style="width:100%;margin-bottom:8px">Edit this chart</button><button class="ctl" id="lyrbtn" style="width:100%">Lyrics library</button></div>
   </aside>
 
   <main id="main">
@@ -223,7 +223,7 @@ body.perform #bar .hideperf{display:none}
 
 <div id="paste" role="dialog" aria-modal="true" aria-label="Add a chart">
   <div id="pastebox">
-    <h2>Add a chart</h2>
+    <h2 id="pastehead">Add a chart</h2>
     <details id="fmthelp">
       <summary>How to write a chart</summary>
       <div class="fmt">
@@ -452,7 +452,7 @@ function render(){
 }
 
 /* ---------- state + wiring ---------- */
-var state={chart:null,name:null,shift:0,numbers:false,size:19,scrolling:false,speed:22,lyrics:false};
+var state={chart:null,name:null,editing:null,shift:0,numbers:false,size:19,scrolling:false,speed:22,lyrics:false};
 var LYRICS={};   /* song name -> raw text, this device only */
 
 /* Persist on the device. Wrapped because some sandboxes block storage;
@@ -661,6 +661,8 @@ document.getElementById("addbtn").addEventListener("click",function(){
   var mine=!!(state.name && MYCHARTS[state.name]);
   del.style.display=mine?"":"none";
   del.textContent=mine?("Delete “"+state.name+"”"):"Delete this chart";
+  state.editing=null;
+  document.getElementById("pastehead").textContent="Add a chart";
   var ta=document.getElementById("pastetext");
   if(!ta.value.trim()){
     ta.value="{title: New Song}\n{key: G}\n{tempo: 120}\n{time: 4/4}\n\n"+
@@ -671,7 +673,12 @@ document.getElementById("addbtn").addEventListener("click",function(){
   pasteEl.classList.add("on");
   ta.focus();
 });
-document.getElementById("pastecancel").addEventListener("click",function(){ pasteEl.classList.remove("on"); });
+document.getElementById("pastecancel").addEventListener("click",function(){
+  pasteEl.classList.remove("on");
+  state.editing=null;
+  document.getElementById("pastetext").value="";
+  document.getElementById("pastehead").textContent="Add a chart";
+});
 /* Charts you add can be exported to a file and reloaded anywhere —
    browser storage is tied to one address, a file is not. */
 function downloadChart(nm,txt){
@@ -694,6 +701,22 @@ document.getElementById("chartsave").addEventListener("click",function(){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
 });
+document.getElementById("editbtn").addEventListener("click",function(){
+  if(!state.name){
+    document.getElementById("pastehead").textContent="Open a song first";
+    pasteEl.classList.add("on");
+    return;
+  }
+  state.editing=state.name;
+  document.getElementById("pastehead").textContent="Edit \u201c"+state.name+"\u201d";
+  document.getElementById("pastetext").value=CHARTS[state.name]||"";
+  var del=document.getElementById("pastedelete");
+  var mine=!!MYCHARTS[state.name];
+  del.style.display=mine?"":"none";
+  pasteEl.classList.add("on");
+  document.getElementById("pastetext").focus();
+});
+
 document.getElementById("chartload").addEventListener("click",function(){
   document.getElementById("chartfile").click();
 });
@@ -741,16 +764,29 @@ document.getElementById("pastedelete").addEventListener("click",function(){
 });
 document.getElementById("pastesave").addEventListener("click",function(){
   var txt=document.getElementById("pastetext").value.trim();
-  if(!txt){ pasteEl.classList.remove("on"); return; }
+  if(!txt){ pasteEl.classList.remove("on"); state.editing=null; return; }
   var c=parseChart(txt);
   var nm=c.title||("Untitled "+(Object.keys(CHARTS).length+1));
+  var wasEditing=state.editing;
+  var isNew=!wasEditing;
+
+  /* Retitling while editing renames the chart rather than leaving two. */
+  if(wasEditing && wasEditing!==nm){
+    delete CHARTS[wasEditing];
+    delete MYCHARTS[wasEditing];
+    if(LYRICS[wasEditing]){ LYRICS[nm]=LYRICS[wasEditing]; delete LYRICS[wasEditing]; saveStore(); }
+  }
+
   CHARTS[nm]=txt;
   MYCHARTS[nm]=txt;
   saveMyCharts();
-  /* Browser storage is tied to one address and is wiped by clearing site
-     data. Write the chart to a real file straight away so it survives. */
-  downloadChart(nm,txt);
+  /* New charts are written to a file immediately; browser storage is tied to
+     one address and is wiped by clearing site data. Edits do not re-download. */
+  if(isNew) downloadChart(nm,txt);
+
+  state.editing=null;
   document.getElementById("pastetext").value="";
+  document.getElementById("pastehead").textContent="Add a chart";
   pasteEl.classList.remove("on");
   buildList(document.getElementById("search").value);
   open(nm);
