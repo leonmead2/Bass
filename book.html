@@ -123,6 +123,25 @@ input[type=range].spd{width:110px;accent-color:#F5B93F}
   text-transform:uppercase;color:#9A6B12}
 #fmthelp code{background:#EDE6D8;border-radius:2px;padding:1px 5px;
   font-family:"IBM Plex Mono",monospace;font-size:12.5px;margin-right:6px}
+#setdlg{position:fixed;inset:0;background:rgba(10,8,6,.72);display:none;
+  align-items:center;justify-content:center;padding:20px;z-index:23}
+#setdlg.on{display:flex}
+#setbox{background:#F4EFE3;color:#15110D;border-radius:5px;padding:18px;
+  width:min(680px,100%);max-height:88vh;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+#setbox h2{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:24px;margin:0}
+.setrow{display:flex;flex-direction:column;gap:7px}
+.slbl{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.18em;
+  text-transform:uppercase;color:#8A806E}
+#setitems{display:flex;flex-direction:column;gap:6px}
+.setitem{display:flex;align-items:center;gap:8px;background:#FFFBF2;
+  border:1px solid #C3B9A4;border-radius:3px;padding:8px 10px;font-size:15px}
+.setitem .num{font-family:"IBM Plex Mono",monospace;color:#9A6B12;min-width:22px}
+.setitem .nm{flex:1;line-height:1.2}
+.setitem button{font-size:14px;padding:5px 9px;background:#E8E2D5;color:#14100C;
+  border:1px solid #B5AB99;border-radius:3px;cursor:pointer}
+#setname{font-family:"IBM Plex Sans",sans-serif;font-size:15px;padding:9px 11px;
+  border:1.5px solid #B5AB99;border-radius:3px;background:#FFFBF2;color:#14100C;min-width:180px;flex:1}
+#setbar{display:flex;align-items:center;gap:6px}
 #lyrdlg{position:fixed;inset:0;background:rgba(10,8,6,.72);display:none;
   align-items:center;justify-content:center;padding:20px;z-index:22}
 #lyrdlg.on{display:flex}
@@ -165,12 +184,13 @@ body.perform #bar .hideperf{display:none}
     <div class="count" id="count"></div>
     <input id="search" type="search" placeholder="Find a song" aria-label="Find a song">
     <div id="songs"></div>
-    <div id="libfoot"><button class="ctl" id="addbtn" style="width:100%;margin-bottom:8px">Add a chart</button><button class="ctl" id="editbtn" style="width:100%;margin-bottom:8px">Edit this chart</button><button class="ctl" id="lyrbtn" style="width:100%">Lyrics</button></div>
+    <div id="libfoot"><button class="ctl" id="addbtn" style="width:100%;margin-bottom:8px">Add a chart</button><button class="ctl" id="editbtn" style="width:100%;margin-bottom:8px">Edit this chart</button><button class="ctl" id="setbtn" style="width:100%;margin-bottom:8px">Setlists</button><button class="ctl" id="lyrbtn" style="width:100%">Lyrics</button></div>
   </aside>
 
   <main id="main">
     <div id="bar">
       <a class="ctl backlink" href="index.html" aria-label="Back to the app list">←</a>
+      <span id="setbar"></span>
       <button class="ctl" id="libtoggle" aria-label="Show song list">☰</button>
       <div class="grp"><span class="tag hideperf">Key</span>
         <button class="ctl" id="down" aria-label="Transpose down">−</button>
@@ -198,6 +218,24 @@ body.perform #bar .hideperf{display:none}
     </div>
     <div id="sheet"><div id="empty">Pick a song from the list to open it.</div></div>
   </main>
+</div>
+
+<div id="setdlg" role="dialog" aria-modal="true" aria-label="Setlists">
+  <div id="setbox">
+    <h2>Setlists</h2>
+    <div class="setrow"><span class="slbl">Saved</span><div class="chips" id="setsaved"></div></div>
+    <div class="setrow"><span class="slbl">Building</span><div id="setitems"></div></div>
+    <div class="pasterow" style="flex-wrap:wrap">
+      <button class="ctl" id="setadd">Add open song</button>
+      <button class="ctl" id="setclear">Empty the list</button>
+    </div>
+    <div class="pasterow" style="flex-wrap:wrap">
+      <input id="setname" type="text" placeholder="Name this setlist" aria-label="Setlist name">
+      <button class="ctl" id="setsave">Save list</button>
+      <button class="ctl" id="setdelete">Delete</button>
+      <button class="ctl" id="setclose">Close</button>
+    </div>
+  </div>
 </div>
 
 <div id="lyrdlg" role="dialog" aria-modal="true" aria-label="Lyrics">
@@ -477,17 +515,28 @@ function names(){ return Object.keys(CHARTS).sort(function(a,b){return a.localeC
 
 function buildList(filter){
   var f=(filter||"").toLowerCase();
-  var ns=names().filter(function(n){return n.toLowerCase().indexOf(f)>=0;});
+  var ns;
+  if(activeSet && SETS[activeSet]){
+    /* a setlist keeps its own order — never sorted alphabetically */
+    ns=SETS[activeSet].filter(function(n){
+      return CHARTS[n] && n.toLowerCase().indexOf(f)>=0;
+    });
+  }else{
+    ns=names().filter(function(n){return n.toLowerCase().indexOf(f)>=0;});
+  }
   songsEl.innerHTML="";
-  ns.forEach(function(n){
+  ns.forEach(function(n,ix){
     var c=parseChart(CHARTS[n]);
     var b=document.createElement("button");
     b.className="song"+(n===state.name?" sel":"");
-    b.innerHTML=esc(c.title||n)+"<small>"+esc([c.key,c.tempo?c.tempo+" bpm":""].filter(Boolean).join("  \u00b7  "))+"</small>";
+    var pre=activeSet?('<span style="color:#F5B93F">'+(ix+1)+'.</span> '):'';
+    b.innerHTML=pre+esc(c.title||n)+"<small>"+esc([c.key,c.tempo?c.tempo+" bpm":""].filter(Boolean).join("  \u00b7  "))+"</small>";
     b.addEventListener("click",function(){ open(n); });
     songsEl.appendChild(b);
   });
-  document.getElementById("count").textContent=ns.length+" charts";
+  document.getElementById("count").textContent=
+    activeSet ? (activeSet+"  \u00b7  "+ns.length+" songs") : (ns.length+" charts");
+  renderSetBar();
 }
 
 function open(n){
@@ -554,6 +603,126 @@ function stopScroll(){
 document.getElementById("scroll").addEventListener("click",function(){ state.scrolling?stopScroll():startScroll(); });
 document.getElementById("speed").addEventListener("input",function(e){ state.speed=+e.target.value; });
 
+/* ---- setlists ---- */
+var setDlg=document.getElementById("setdlg");
+
+function renderSetBar(){
+  var bar=document.getElementById("setbar");
+  if(!bar) return;
+  bar.innerHTML="";
+  if(!activeSet || !SETS[activeSet]){ bar.style.display="none"; return; }
+  bar.style.display="flex";
+  var list=SETS[activeSet].filter(function(n){return CHARTS[n];});
+  var at=list.indexOf(state.name);
+
+  function nav(label,delta){
+    var b=document.createElement("button");
+    b.className="ctl"; b.textContent=label;
+    b.addEventListener("click",function(){
+      if(!list.length) return;
+      var i=(at<0)?0:at+delta;
+      if(i<0) i=0;
+      if(i>list.length-1) i=list.length-1;
+      open(list[i]);
+    });
+    return b;
+  }
+  bar.appendChild(nav("\u25c0",-1));
+  var pos=document.createElement("span");
+  pos.className="tag";
+  pos.style.cssText="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#F5B93F";
+  pos.textContent=(at<0?"–":(at+1))+"/"+list.length;
+  bar.appendChild(pos);
+  bar.appendChild(nav("\u25b6",1));
+  var x=document.createElement("button");
+  x.className="ctl"; x.textContent="All";
+  x.addEventListener("click",function(){
+    activeSet=null;
+    document.getElementById("search").value="";
+    buildList("");
+  });
+  bar.appendChild(x);
+}
+
+function renderSetDlg(){
+  var sv=document.getElementById("setsaved"); sv.innerHTML="";
+  var nms=Object.keys(SETS);
+  if(!nms.length){
+    sv.innerHTML='<span class="slbl">none saved yet</span>';
+  }else{
+    nms.forEach(function(nm){
+      var b=document.createElement("button");
+      b.className="ctl";
+      b.textContent=nm+" ("+SETS[nm].length+")";
+      b.setAttribute("aria-pressed",(activeSet===nm)?"true":"false");
+      b.addEventListener("click",function(){
+        activeSet=nm;
+        building=SETS[nm].slice();
+        document.getElementById("setname").value=nm;
+        document.getElementById("search").value="";
+        renderSetDlg(); buildList("");
+        if(building.length) open(building[0]);
+      });
+      sv.appendChild(b);
+    });
+  }
+
+  var box=document.getElementById("setitems"); box.innerHTML="";
+  if(!building.length){
+    box.innerHTML='<span class="slbl">open a song and tap “Add open song”</span>';
+    return;
+  }
+  building.forEach(function(n,i){
+    var row=document.createElement("div"); row.className="setitem";
+    var num=document.createElement("span"); num.className="num"; num.textContent=(i+1)+".";
+    var nm=document.createElement("span"); nm.className="nm"; nm.textContent=n;
+    row.appendChild(num); row.appendChild(nm);
+    function mk(label,fn){
+      var b=document.createElement("button"); b.textContent=label;
+      b.addEventListener("click",fn); return b;
+    }
+    row.appendChild(mk("\u2191",function(){
+      if(i>0){ var t=building[i-1]; building[i-1]=building[i]; building[i]=t; renderSetDlg(); }
+    }));
+    row.appendChild(mk("\u2193",function(){
+      if(i<building.length-1){ var t=building[i+1]; building[i+1]=building[i]; building[i]=t; renderSetDlg(); }
+    }));
+    row.appendChild(mk("\u2715",function(){ building.splice(i,1); renderSetDlg(); }));
+    box.appendChild(row);
+  });
+}
+
+document.getElementById("setbtn").addEventListener("click",function(){
+  if(!building.length && activeSet && SETS[activeSet]) building=SETS[activeSet].slice();
+  renderSetDlg(); setDlg.classList.add("on");
+});
+document.getElementById("setclose").addEventListener("click",function(){ setDlg.classList.remove("on"); });
+document.getElementById("setadd").addEventListener("click",function(){
+  if(!state.name) return;
+  building.push(state.name);      /* a song may appear twice if the night calls for it */
+  renderSetDlg();
+});
+document.getElementById("setclear").addEventListener("click",function(){
+  building=[]; renderSetDlg();
+});
+document.getElementById("setsave").addEventListener("click",function(){
+  var nm=(document.getElementById("setname").value||"").trim();
+  if(!nm || !building.length) return;
+  SETS[nm]=building.slice();
+  saveSets();
+  activeSet=nm;
+  document.getElementById("search").value="";
+  renderSetDlg(); buildList("");
+});
+document.getElementById("setdelete").addEventListener("click",function(){
+  var nm=(document.getElementById("setname").value||"").trim();
+  if(!nm || !SETS[nm]) return;
+  delete SETS[nm]; saveSets();
+  if(activeSet===nm){ activeSet=null; }
+  building=[]; document.getElementById("setname").value="";
+  renderSetDlg(); buildList(document.getElementById("search").value);
+});
+
 /* ---- lyrics ---- */
 var lyrDlg=document.getElementById("lyrdlg");
 function syncLyr(){
@@ -616,7 +785,7 @@ document.getElementById("pastedelete").addEventListener("click",function(){
   buildList(document.getElementById("search").value); render();
 });
 document.getElementById("chartsave").addEventListener("click",function(){
-  downloadBlob("my-book.json",JSON.stringify({charts:MYCHARTS,lyrics:LYRICS},null,1),"application/json");
+  downloadBlob("my-book.json",JSON.stringify({charts:MYCHARTS,lyrics:LYRICS,sets:SETS},null,1),"application/json");
 });
 document.getElementById("chartload").addEventListener("click",function(){
   document.getElementById("chartfile").click();
@@ -630,6 +799,7 @@ document.getElementById("chartfile").addEventListener("change",function(e){
       var o=JSON.parse(txt), src=o.charts||o;
       Object.keys(src).forEach(function(k){ MYCHARTS[k]=src[k]; CHARTS[k]=src[k]; });
       if(o.lyrics){ Object.keys(o.lyrics).forEach(function(k){LYRICS[k]=o.lyrics[k];}); saveStore(); }
+      if(o.sets){ Object.keys(o.sets).forEach(function(k){SETS[k]=o.sets[k];}); saveSets(); }
     }catch(err){
       var c=parseChart(txt);
       var nm=c.title||("Untitled "+(Object.keys(CHARTS).length+1));
@@ -705,7 +875,7 @@ document.addEventListener("keydown",function(e){
   else if(e.key==="ArrowUp"||e.key==="PageUp"){ e.preventDefault(); sheet.scrollTop-=sheet.clientHeight*0.85; }
 });
 
-loadStore(); loadMyCharts(); buildList(""); sync(); syncLyr(); render();
+loadStore(); loadMyCharts(); loadSets(); buildList(""); sync(); syncLyr(); render();
 })();
 </script>
 </body>
