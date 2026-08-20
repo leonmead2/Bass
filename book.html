@@ -113,6 +113,16 @@ input[type=range].spd{width:110px;accent-color:#F5B93F}
 .bar .end{color:var(--brass);font-weight:700;font-size:.8em;vertical-align:.35em;margin-right:3px}
 .plain{font-family:"IBM Plex Sans",sans-serif;color:var(--dim);margin:6px 0}
 
+#pagenav{position:fixed;right:calc(14px + env(safe-area-inset-right));
+  bottom:calc(18px + env(safe-area-inset-bottom));z-index:12;
+  display:flex;flex-direction:column;gap:8px}
+#pagenav button{width:54px;height:54px;border-radius:27px;font-size:19px;line-height:1;
+  background:rgba(20,16,12,.72);color:#F4EFE3;border:1px solid rgba(244,239,227,.35);
+  cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#pagenav button:active{background:#F5B93F;color:#000}
+#pagenav button:focus-visible{outline:2px solid #F5B93F;outline-offset:3px}
+body.stage #pagenav button{background:rgba(240,235,222,.16)}
+@media (max-width:560px){#pagenav button{width:48px;height:48px;border-radius:24px}}
 #empty{padding:60px 24px;color:var(--dim);font-size:16px}
 .lyrblock{font-family:"IBM Plex Sans",sans-serif;font-size:.82em;line-height:1.5;color:var(--ink);
   opacity:.86;white-space:pre-wrap;margin:2px 0 12px;padding-left:10px;border-left:2px solid var(--rule)}
@@ -225,6 +235,10 @@ body.perform #bar .hideperf{display:none}
         <button class="ctl" id="stage" aria-pressed="false">Stage</button>
         <button class="ctl" id="perform" aria-pressed="false">Focus</button>
       </div>
+    </div>
+    <div id="pagenav">
+      <button id="pgup" aria-label="Page back">▲</button>
+      <button id="pgdn" aria-label="Page forward">▼</button>
     </div>
     <div id="sheet"><div id="empty">Pick a song from the list to open it.</div></div>
   </main>
@@ -911,12 +925,49 @@ document.getElementById("pastesave").addEventListener("click",function(){
 });
 
 /* keyboard: arrows page the chart, space toggles scroll */
-document.addEventListener("keydown",function(e){
-  if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT")return;
+/* Foot-pedal keys keep working while a search box has focus. Up/Down do
+   nothing useful in a single-line field, so they page the chart instead.
+   Typing is never hijacked: space still types, and a textarea or an open
+   dialog takes the keys back entirely. */
+/* Paging: scroll a screen, and at the end of a chart step to the next
+   song in the active setlist rather than stopping dead. */
+function pageMove(down){
   var sheet=document.getElementById("sheet");
-  if(e.key===" "){ e.preventDefault(); state.scrolling?stopScroll():startScroll(); }
-  else if(e.key==="ArrowDown"||e.key==="PageDown"){ e.preventDefault(); sheet.scrollTop+=sheet.clientHeight*0.85; }
-  else if(e.key==="ArrowUp"||e.key==="PageUp"){ e.preventDefault(); sheet.scrollTop-=sheet.clientHeight*0.85; }
+  var atEnd=(sheet.scrollTop+sheet.clientHeight>=sheet.scrollHeight-4);
+  var atTop=(sheet.scrollTop<=2);
+  if(activeSet && SETS[activeSet]){
+    var list=SETS[activeSet].filter(function(n){return CHARTS[n];});
+    var at=list.indexOf(state.name);
+    if(down && atEnd && at>=0 && at<list.length-1){ open(list[at+1]); return; }
+    if(!down && atTop && at>0){ open(list[at-1]); return; }
+  }
+  sheet.scrollTop += (down?1:-1)*sheet.clientHeight*0.85;
+}
+document.getElementById("pgdn").addEventListener("click",function(){ pageMove(true); });
+document.getElementById("pgup").addEventListener("click",function(){ pageMove(false); });
+
+function dialogOpen(){
+  return ["paste","lyrdlg","setdlg"].some(function(id){
+    var el=document.getElementById(id);
+    return el && el.classList.contains("on");
+  });
+}
+document.addEventListener("keydown",function(e){
+  var tag=e.target&&e.target.tagName;
+  var typing=(tag==="TEXTAREA");
+  var inField=(tag==="INPUT");
+  if(typing || dialogOpen()) return;
+
+  var sheet=document.getElementById("sheet");
+  var pageKey=(e.key==="ArrowDown"||e.key==="PageDown"||e.key==="ArrowUp"||e.key==="PageUp");
+
+  if(e.key===" " && !inField){
+    e.preventDefault(); state.scrolling?stopScroll():startScroll(); return;
+  }
+  if(!pageKey) return;
+
+  e.preventDefault();
+  pageMove(e.key==="ArrowDown"||e.key==="PageDown");
 });
 
 loadStore(); loadMyCharts(); loadSets(); buildList(""); sync(); syncLyr(); render();
