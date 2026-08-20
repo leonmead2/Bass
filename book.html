@@ -139,6 +139,16 @@ input[type=range].spd{width:110px;accent-color:#F5B93F}
 .setitem .nm{flex:1;line-height:1.2}
 .setitem button{font-size:14px;padding:5px 9px;background:#E8E2D5;color:#14100C;
   border:1px solid #B5AB99;border-radius:3px;cursor:pointer}
+#setsearch{font-family:"IBM Plex Sans",sans-serif;font-size:15px;padding:9px 11px;
+  border:1.5px solid #B5AB99;border-radius:3px;background:#FFFBF2;color:#14100C;width:100%}
+#setpicker{max-height:240px;overflow-y:auto;border:1px solid #C3B9A4;border-radius:3px;
+  background:#FFFBF2;display:flex;flex-direction:column}
+#setpicker button{text-align:left;background:transparent;border:0;
+  border-bottom:1px solid #E4DCCB;padding:10px 12px;font-size:15px;cursor:pointer;
+  font-family:"IBM Plex Sans",sans-serif;color:#15110D}
+#setpicker button:hover{background:#EFE7D8}
+#setpicker button:last-child{border-bottom:0}
+#setpicker button span{color:#9A6B12;font-family:"IBM Plex Mono",monospace;font-size:12px;margin-left:8px}
 #setname{font-family:"IBM Plex Sans",sans-serif;font-size:15px;padding:9px 11px;
   border:1.5px solid #B5AB99;border-radius:3px;background:#FFFBF2;color:#14100C;min-width:180px;flex:1}
 #setbar{display:flex;align-items:center;gap:6px}
@@ -225,8 +235,12 @@ body.perform #bar .hideperf{display:none}
     <h2>Setlists</h2>
     <div class="setrow"><span class="slbl">Saved</span><div class="chips" id="setsaved"></div></div>
     <div class="setrow"><span class="slbl">Building</span><div id="setitems"></div></div>
+    <div class="setrow"><span class="slbl">Add songs</span>
+      <input id="setsearch" type="text" placeholder="Search the library" aria-label="Search charts to add">
+      <div id="setpicker"></div>
+    </div>
     <div class="pasterow" style="flex-wrap:wrap">
-      <button class="ctl" id="setadd">Add open song</button>
+      <button class="ctl" id="setadd">Add the open song</button>
       <button class="ctl" id="setclear">Empty the list</button>
     </div>
     <div class="pasterow" style="flex-wrap:wrap">
@@ -649,32 +663,31 @@ function renderSetBar(){
   bar.appendChild(x);
 }
 
-function renderSetDlg(){
+function renderSetSaved(){
   var sv=document.getElementById("setsaved"); sv.innerHTML="";
   var nms=Object.keys(SETS);
-  if(!nms.length){
-    sv.innerHTML='<span class="slbl">none saved yet</span>';
-  }else{
-    nms.forEach(function(nm){
-      var b=document.createElement("button");
-      b.className="ctl";
-      b.textContent=nm+" ("+SETS[nm].length+")";
-      b.setAttribute("aria-pressed",(activeSet===nm)?"true":"false");
-      b.addEventListener("click",function(){
-        activeSet=nm;
-        building=SETS[nm].slice();
-        document.getElementById("setname").value=nm;
-        document.getElementById("search").value="";
-        renderSetDlg(); buildList("");
-        if(building.length) open(building[0]);
-      });
-      sv.appendChild(b);
+  if(!nms.length){ sv.innerHTML='<span class="slbl">none saved yet</span>'; return; }
+  nms.forEach(function(nm){
+    var b=document.createElement("button");
+    b.className="ctl";
+    b.textContent=nm+" ("+SETS[nm].length+")";
+    b.setAttribute("aria-pressed",(activeSet===nm)?"true":"false");
+    b.addEventListener("click",function(){
+      activeSet=nm;
+      building=SETS[nm].slice();
+      document.getElementById("setname").value=nm;
+      document.getElementById("search").value="";
+      renderSetDlg(); buildList("");
+      if(building.length) open(building[0]);
     });
-  }
+    sv.appendChild(b);
+  });
+}
 
+function renderSetItems(){
   var box=document.getElementById("setitems"); box.innerHTML="";
   if(!building.length){
-    box.innerHTML='<span class="slbl">open a song and tap “Add open song”</span>';
+    box.innerHTML='<span class="slbl">pick songs from the list below</span>';
     return;
   }
   building.forEach(function(n,i){
@@ -687,14 +700,39 @@ function renderSetDlg(){
       b.addEventListener("click",fn); return b;
     }
     row.appendChild(mk("\u2191",function(){
-      if(i>0){ var t=building[i-1]; building[i-1]=building[i]; building[i]=t; renderSetDlg(); }
+      if(i>0){ var t=building[i-1]; building[i-1]=building[i]; building[i]=t; renderSetItems(); }
     }));
     row.appendChild(mk("\u2193",function(){
-      if(i<building.length-1){ var t=building[i+1]; building[i+1]=building[i]; building[i]=t; renderSetDlg(); }
+      if(i<building.length-1){ var t=building[i+1]; building[i+1]=building[i]; building[i]=t; renderSetItems(); }
     }));
-    row.appendChild(mk("\u2715",function(){ building.splice(i,1); renderSetDlg(); }));
+    row.appendChild(mk("\u2715",function(){ building.splice(i,1); renderSetItems(); }));
     box.appendChild(row);
   });
+}
+
+/* The whole library, searchable, inside the dialog — adding a song should
+   never mean closing this and hunting for it in the sidebar. */
+function renderSetPicker(){
+  var box=document.getElementById("setpicker"); box.innerHTML="";
+  var q=(document.getElementById("setsearch").value||"").toLowerCase();
+  var list=names().filter(function(n){ return n.toLowerCase().indexOf(q)>=0; });
+  if(!list.length){ box.innerHTML='<span class="slbl" style="padding:10px">no match</span>'; return; }
+  list.slice(0,300).forEach(function(n){
+    var c=parseChart(CHARTS[n]);
+    var b=document.createElement("button");
+    b.innerHTML=esc(c.title||n)+(c.key?'<span>'+esc(c.key)+'</span>':'');
+    b.addEventListener("click",function(){
+      building.push(n);
+      renderSetItems();        /* picker keeps its place and its search text */
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderSetDlg(){
+  renderSetSaved();
+  renderSetItems();
+  renderSetPicker();
 }
 
 document.getElementById("setbtn").addEventListener("click",function(){
@@ -702,6 +740,7 @@ document.getElementById("setbtn").addEventListener("click",function(){
   renderSetDlg(); setDlg.classList.add("on");
 });
 document.getElementById("setclose").addEventListener("click",function(){ setDlg.classList.remove("on"); });
+document.getElementById("setsearch").addEventListener("input",renderSetPicker);
 document.getElementById("setadd").addEventListener("click",function(){
   if(!state.name) return;
   building.push(state.name);      /* a song may appear twice if the night calls for it */
